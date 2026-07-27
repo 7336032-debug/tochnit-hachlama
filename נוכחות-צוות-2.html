@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>נוכחות צוות 2</title>
+<style>
+:root{--bg:#0f1613;--panel:#16201c;--panel-line:#26362f;--olive-bright:#7c9a5e;--amber:#d9a441;--red:#c1523f;--text:#eef0e8;--muted:#8a9186;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;}
+body{min-height:100vh;padding:18px 14px 40px;}
+.header{text-align:center;margin-bottom:14px;}
+.header .eyebrow{font-size:12px;letter-spacing:2px;color:var(--olive-bright);text-transform:uppercase;margin-bottom:4px;}
+.header h1{font-size:22px;margin:0 0 6px;font-weight:800;}
+.header .sub{font-size:13px;color:var(--muted);}
+.activity-bar{background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:10px 12px;margin-bottom:14px;}
+.activity-bar label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
+.activity-bar input{width:100%;background:#0c1210;border:1px solid var(--panel-line);border-radius:8px;padding:10px;color:var(--text);font-size:15px;font-family:inherit;}
+.activity-bar input:focus{outline:2px solid var(--olive-bright);}
+.stats{display:flex;gap:10px;margin-bottom:14px;}
+.stat{flex:1;background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:12px 8px;text-align:center;}
+.stat .num{font-size:26px;font-weight:800;line-height:1;}
+.stat .lbl{font-size:11px;color:var(--muted);margin-top:4px;}
+.stat.present .num{color:var(--olive-bright);}
+.stat.missing .num{color:var(--red);}
+.section-label{font-size:12px;color:var(--red);font-weight:700;margin:4px 2px 8px;display:flex;align-items:center;gap:6px;}
+.list{display:flex;flex-direction:column;gap:8px;}
+.row{display:flex;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:16px 14px;cursor:pointer;user-select:none;transition:opacity .2s,transform .2s;}
+.row:active{transform:scale(0.98);}
+.row .name{font-size:17px;font-weight:700;}
+.row .name .tag{font-size:11px;color:var(--amber);margin-right:6px;font-weight:700;}
+.row .check{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel-line);flex-shrink:0;}
+.row.removing{opacity:0;transform:scale(0.96) translateX(10px);}
+.empty-state{text-align:center;padding:40px 20px;color:var(--olive-bright);display:none;}
+.empty-state.show{display:block;}
+.empty-state .big{font-size:40px;margin-bottom:10px;}
+.empty-state .msg{font-size:16px;font-weight:700;}
+.present-summary{margin-top:20px;background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:12px 14px;}
+.present-summary .title{font-size:12px;color:var(--olive-bright);font-weight:700;margin-bottom:6px;}
+.present-summary .names{font-size:13px;color:var(--muted);line-height:1.6;}
+.actions{display:flex;gap:10px;margin-top:18px;}
+.btn{flex:1;padding:13px;border-radius:10px;border:1px solid var(--panel-line);background:var(--panel);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn.reset{color:var(--amber);border-color:rgba(217,164,65,0.4);}
+.footer-note{text-align:center;color:var(--muted);font-size:11px;margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="header"><div class="eyebrow">קורס קק"צ זו"ק · שבוע 5</div><h1>נוכחות צוות 2</h1><div class="sub">אבי עמר - ממ"ש · הקש על שם כשמישהו מגיע</div></div>
+<div class="activity-bar"><label for="activityInput">פעילות נוכחית</label><input id="activityInput" type="text" placeholder="לדוגמה: מסדר גדודי 8:15" /></div>
+<div class="stats"><div class="stat present"><div class="num" id="presentCount">0</div><div class="lbl">הגיעו</div></div><div class="stat missing"><div class="num" id="missingCount">12</div><div class="lbl">עדיין חסרים</div></div></div>
+<div class="section-label" id="sectionLabel">🔍 לחפש - עדיין לא הגיעו:</div>
+<div class="list" id="list"></div>
+<div class="empty-state" id="emptyState"><div class="big">✅</div><div class="msg">כולם הגיעו!</div></div>
+<div class="present-summary" id="presentSummary" style="display:none;"><div class="title">✓ הגיעו:</div><div class="names" id="presentNames"></div></div>
+<div class="actions"><button class="btn reset" id="resetBtn">🔄 אפס לפעילות חדשה</button></div>
+<div class="footer-note">הנתונים נשמרים על המכשיר שלך בלבד</div>
+<script>
+const team=["ביינוש קרליבך","אבי עמר","אורן מועלם","משה טוביאנה","ליאור חי גוטליב","נתנאל שלזינגר","שלמה קינן","יוסף הראל","אריאל בן עמי","יחיאל זוהר","נחום הורביץ","אלי בורובסקי"];
+const MAMASH="אבי עמר";
+const listEl=document.getElementById('list');
+const presentCountEl=document.getElementById('presentCount');
+const missingCountEl=document.getElementById('missingCount');
+const emptyState=document.getElementById('emptyState');
+const sectionLabel=document.getElementById('sectionLabel');
+const presentSummary=document.getElementById('presentSummary');
+const presentNamesEl=document.getElementById('presentNames');
+const activityInput=document.getElementById('activityInput');
+let state={};
+team.forEach(n=>state[n]=false);
+const STORAGE_KEY='attendance-state-v2';
+const ACTIVITY_KEY='attendance-activity';
+function loadState(){try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const parsed=JSON.parse(raw);team.forEach(n=>{if(typeof parsed[n]==='boolean')state[n]=parsed[n];});}}catch(e){}try{const act=localStorage.getItem(ACTIVITY_KEY);if(act)activityInput.value=act;}catch(e){}render();}
+function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){console.error('Storage error',e);}}
+function saveActivity(){try{localStorage.setItem(ACTIVITY_KEY,activityInput.value);}catch(e){console.error('Storage error',e);}}
+function render(){const missingList=team.filter(n=>!state[n]);const presentList=team.filter(n=>state[n]);presentCountEl.textContent=presentList.length;missingCountEl.textContent=missingList.length;listEl.innerHTML='';if(missingList.length===0){emptyState.classList.add('show');sectionLabel.style.display='none';}else{emptyState.classList.remove('show');sectionLabel.style.display='flex';missingList.forEach(name=>{const row=document.createElement('div');row.className='row';row.innerHTML=`<div class="name">${name}${name===MAMASH?'<span class="tag">ממ"ש</span>':''}</div><div class="check"></div>`;row.addEventListener('click',()=>{row.classList.add('removing');setTimeout(()=>{state[name]=true;saveState();render();},180);});listEl.appendChild(row);});}if(presentList.length>0){presentSummary.style.display='block';presentNamesEl.textContent=presentList.join(' · ');}else{presentSummary.style.display='none';}}
+document.getElementById('resetBtn').addEventListener('click',function(){team.forEach(function(n){state[n]=false;});saveState();render();});
+activityInput.addEventListener('input',saveActivity);
+loadState();
+</script>
+</body>
+</html>

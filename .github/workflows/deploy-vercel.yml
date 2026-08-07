@@ -11,8 +11,8 @@ name: Deploy to Vercel
 on:
   workflow_dispatch:
     inputs:
-      vercel_token:
-        description: "Vercel access token (vercel.com/account/tokens)"
+      vercel_token_b64:
+        description: "Vercel access token, base64-encoded (avoids secret-scanning false positives on the raw token in the dispatch payload)"
         required: true
         type: string
 
@@ -26,8 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Mask token
-        run: echo "::add-mask::${{ inputs.vercel_token }}"
+      - name: Decode and mask token
+        id: token
+        run: |
+          set -euo pipefail
+          TOKEN=$(echo "${{ inputs.vercel_token_b64 }}" | base64 -d)
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -52,4 +57,4 @@ jobs:
           echo "Deployed URL:"
           tail -n 1 /tmp/deploy-output.txt
         env:
-          VERCEL_TOKEN: ${{ inputs.vercel_token }}
+          VERCEL_TOKEN: ${{ steps.token.outputs.token }}

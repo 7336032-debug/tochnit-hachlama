@@ -1,0 +1,55 @@
+name: Deploy to Vercel
+
+# Manually-triggered deploy: builds the app against the real Supabase
+# project and publishes it to Vercel, giving a real public URL. Takes
+# the Vercel access token as a run-time input (not a stored repo secret)
+# so it can be triggered without needing repo Settings/Secrets access.
+# The Supabase URL and anon/publishable key are public-by-design values
+# (safe to embed in the client bundle), so they're inlined below rather
+# than passed as inputs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      vercel_token:
+        description: "Vercel access token (vercel.com/account/tokens)"
+        required: true
+        type: string
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: "https://bwfsbmkyiiqlrhbuyhpy.supabase.co"
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_Ljf2NgSqjMPcScyibIvv0Q_coW_TyRC"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask token
+        run: echo "::add-mask::${{ inputs.vercel_token }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel (production)
+        run: |
+          set -euo pipefail
+          vercel deploy \
+            --prod \
+            --yes \
+            --token="$VERCEL_TOKEN" \
+            --build-env NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            --build-env NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            -e NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            -e NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            | tee /tmp/deploy-output.txt
+          echo "---"
+          echo "Deployed URL:"
+          tail -n 1 /tmp/deploy-output.txt
+        env:
+          VERCEL_TOKEN: ${{ inputs.vercel_token }}

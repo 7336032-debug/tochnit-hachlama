@@ -1,14 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { loadState, saveState, newId, mergeWithDefaults } from '../lib/db.js';
 import { computeBehaviorProfile } from '../lib/behaviorProfile.js';
 import { computeStreakCount, nextShieldGrantAt } from '../lib/streak.js';
 import { computeNewlyAchieved } from '../lib/milestones.js';
 import { todayISO } from '../lib/format.js';
-import { loadSyncConfig, saveSyncConfig, clearSyncConfig } from '../lib/syncConfig.js';
-import { encryptPayload, decryptPayload, generatePin, createCloudBlob, pushCloudBlob, pullCloudBlob } from '../lib/cloudSync.js';
+import { encodeStateToCode, decodeCodeToState } from '../lib/exportImport.js';
 
 const DataContext = createContext(null);
-const SYNC_DEBOUNCE_MS = 2500;
 
 function recompute(next) {
   next.behaviorProfile = computeBehaviorProfile(next);
@@ -25,8 +23,6 @@ function recompute(next) {
 
 export function DataProvider({ children }) {
   const [state, setState] = useState(() => recompute(loadState()));
-  const [syncConfig, setSyncConfig] = useState(() => loadSyncConfig());
-  const [syncStatus, setSyncStatus] = useState({ syncing: false, lastSyncAt: null, error: null });
 
   useEffect(() => {
     saveState(state);
@@ -47,93 +43,13 @@ export function DataProvider({ children }) {
     });
   }, []);
 
-  const pullNow = useCallback(async () => {
-    if (!syncConfig) return;
-    setSyncStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const blob = await pullCloudBlob(syncConfig.id);
-      const cloudState = await decryptPayload(blob, syncConfig.pin);
-      setState(recompute(mergeWithDefaults(cloudState)));
-      setSyncStatus({ syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-    } catch (err) {
-      setSyncStatus((s) => ({ ...s, syncing: false, error: err.message }));
-    }
-  }, [syncConfig]);
+  // Fully offline device-to-device transfer (no network call, nothing that
+  // can be "down") - the user copies the code herself between devices.
+  const exportStateCode = useCallback(() => encodeStateToCode(state), [state]);
 
-  const pushNow = useCallback(async () => {
-    if (!syncConfig) return;
-    setSyncStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const payload = await encryptPayload(state, syncConfig.pin);
-      await pushCloudBlob(syncConfig.id, payload);
-      setSyncStatus({ syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-    } catch (err) {
-      setSyncStatus((s) => ({ ...s, syncing: false, error: err.message }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncConfig, state]);
-
-  // one-time pull when a device that's already paired opens the app
-  const pulledOnMount = useRef(false);
-  useEffect(() => {
-    if (syncConfig && !pulledOnMount.current) {
-      pulledOnMount.current = true;
-      pullNow();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // debounced auto-push whenever data changes on a paired device
-  const pushTimer = useRef(null);
-  useEffect(() => {
-    if (!syncConfig) return undefined;
-    if (pushTimer.current) clearTimeout(pushTimer.current);
-    pushTimer.current = setTimeout(() => {
-      pushNow();
-    }, SYNC_DEBOUNCE_MS);
-    return () => clearTimeout(pushTimer.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, syncConfig]);
-
-  const startCloudSync = useCallback(async () => {
-    setSyncStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const pin = generatePin();
-      const payload = await encryptPayload(state, pin);
-      const id = await createCloudBlob(payload);
-      const config = { id, pin };
-      saveSyncConfig(config);
-      setSyncConfig(config);
-      setSyncStatus({ syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-      return config;
-    } catch (err) {
-      setSyncStatus((s) => ({ ...s, syncing: false, error: err.message }));
-      return null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
-  const connectCloudSync = useCallback(async (id, pin) => {
-    setSyncStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const blob = await pullCloudBlob(id);
-      const cloudState = await decryptPayload(blob, pin);
-      const config = { id, pin };
-      saveSyncConfig(config);
-      setSyncConfig(config);
-      setState(recompute(mergeWithDefaults(cloudState)));
-      setSyncStatus({ syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-      return true;
-    } catch (err) {
-      setSyncStatus((s) => ({ ...s, syncing: false, error: err.message }));
-      return false;
-    }
-  }, []);
-
-  const disconnectSync = useCallback(() => {
-    clearSyncConfig();
-    setSyncConfig(null);
-    setSyncStatus({ syncing: false, lastSyncAt: null, error: null });
+  const importStateCode = useCallback((code) => {
+    const imported = decodeCodeToState(code);
+    setState(recompute(mergeWithDefaults(imported)));
   }, []);
 
   const actions = useMemo(
@@ -267,8 +183,8 @@ export function DataProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ state, ...actions, syncConfig, syncStatus, startCloudSync, connectCloudSync, pushNow, pullNow, disconnectSync }),
-    [state, actions, syncConfig, syncStatus, startCloudSync, connectCloudSync, pushNow, pullNow, disconnectSync],
+    () => ({ state, ...actions, exportStateCode, importStateCode }),
+    [state, actions, exportStateCode, importStateCode],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

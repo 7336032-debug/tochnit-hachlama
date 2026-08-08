@@ -4,26 +4,20 @@
   line-height: 1.6;
 }
 
-.sync-copy-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--surface-alt);
+.sync-code-box {
+  width: 100%;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  word-break: break-all;
 }
-
-.sync-copy-label { font-size: 12px; color: var(--text-muted); }
-.sync-copy-value { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; }
-
-.sync-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.sync-code-box:focus { outline: none; border-color: var(--green); }
 
 .sync-error {
   background: var(--red-bg);

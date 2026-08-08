@@ -1,13 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext.jsx';
 import CoachCard from '../components/CoachCard.jsx';
-import HealthGauge from '../components/HealthGauge.jsx';
+import DashboardSnapshot from '../components/DashboardSnapshot.jsx';
 import EnvelopeBar from '../components/EnvelopeBar.jsx';
 import BusinessPaceCard from '../components/BusinessPaceCard.jsx';
 import SavingsCard from '../components/SavingsCard.jsx';
 import {
   layer2Status,
-  healthScore,
   totalCurrentDebt,
   totalOriginalDebt,
   overallPercentPaid,
@@ -22,7 +21,6 @@ export default function Dashboard() {
   const { state } = useData();
   const mKey = monthKey(todayISO());
   const status = layer2Status(state, mKey);
-  const score = healthScore(state, mKey);
   const totalDebt = totalCurrentDebt(state);
   const originalDebt = totalOriginalDebt(state);
   const pctPaid = overallPercentPaid(state);
@@ -32,27 +30,27 @@ export default function Dashboard() {
   const paceRatio = status.target > 0 ? status.paidToDebtThisMonth / status.target : 0;
   const paceColor = paceRatio >= 1 ? 'green' : paceRatio >= 0.6 ? 'amber' : 'red';
   const paceColorVar = paceRatio >= 1 ? 'var(--green)' : paceRatio >= 0.6 ? 'var(--amber)' : 'var(--red)';
+  const isShortfall = status.hasIncome && status.gap > 0 && status.paidToDebtThisMonth < status.target;
 
   return (
     <div className="stack">
+      <DashboardSnapshot />
+
       <CoachCard />
 
-      <div className="card dashboard-top-row">
-        <HealthGauge score={score} />
-        <div className="dashboard-quick-stats">
-          <div className="quick-stat">
-            <span className="muted">💰 הכנסה החודש</span>
-            <span className="num quick-stat-val">{money(status.income)}</span>
-          </div>
-          <div className="quick-stat">
-            <span className="muted">🏠 הוצאות קבועות</span>
-            <span className="num quick-stat-val">{money(status.layer1)}</span>
-          </div>
-          <div className="quick-stat">
-            <span className="muted">{status.surplus >= 0 ? '✅ עודף החודש' : '🚨 גירעון החודש'}</span>
-            <span className="num quick-stat-val" style={{ color: status.surplus >= 0 ? 'var(--green)' : 'var(--red)' }}>
-              {money(status.surplus)}
-            </span>
+      <div className="month-stats-row card">
+        <div className="month-stat">
+          <div className="muted">💰 הכנסה</div>
+          <div className="num month-stat-val">{money(status.income)}</div>
+        </div>
+        <div className="month-stat">
+          <div className="muted">🏠 קבועות</div>
+          <div className="num month-stat-val">{money(status.layer1)}</div>
+        </div>
+        <div className="month-stat">
+          <div className="muted">{status.surplus >= 0 ? '✅ עודף' : '🚨 גירעון'}</div>
+          <div className="num month-stat-val" style={{ color: status.surplus >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {money(status.surplus)}
           </div>
         </div>
       </div>
@@ -70,22 +68,25 @@ export default function Dashboard() {
           <span className="muted num">שולם החודש: {money(status.paidToDebtThisMonth)}</span>
           <span className="muted num">יעד: {money(status.target)}</span>
         </div>
-        {status.paidToDebtThisMonth >= status.target ? (
+        {isShortfall ? (
+          <details className="detail-toggle" open>
+            <summary>⚠️ יש פער החודש - לפרטים</summary>
+            <div className="pace-gap-note">
+              <p>
+                החודש יש לך עודף של <b className="num">{money(status.surplus)}</b>, היעד דורש{' '}
+                <b className="num">{money(status.target)}</b> - חסר <b className="num">{money(status.gap)}</b>.
+              </p>
+              {actions.length > 0 && (
+                <ul className="pace-actions">
+                  {actions.slice(0, 3).map((a) => (
+                    <li key={a.id}>{a.text}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </details>
+        ) : status.paidToDebtThisMonth >= status.target ? (
           <p className="pace-gap-note pace-gap-good">🎉 כבר העברת החודש את מלוא היעד לסילוק החוב - כל הכבוד!</p>
-        ) : status.hasIncome && status.gap > 0 ? (
-          <div className="pace-gap-note">
-            <p>
-              החודש יש לך עודף של <b className="num">{money(status.surplus)}</b>, היעד דורש{' '}
-              <b className="num">{money(status.target)}</b> - חסר <b className="num">{money(status.gap)}</b>.
-            </p>
-            {actions.length > 0 && (
-              <ul className="pace-actions">
-                {actions.slice(0, 3).map((a) => (
-                  <li key={a.id}>{a.text}</li>
-                ))}
-              </ul>
-            )}
-          </div>
         ) : status.hasIncome ? (
           <p className="pace-gap-note pace-gap-good">🎉 את בקצב טוב להשלים את היעד החודשי!</p>
         ) : (
@@ -122,7 +123,7 @@ export default function Dashboard() {
       <div className="section-title">💌 המעטפות שלך החודש</div>
       <div className="stack">
         {state.envelopes.map((env) => (
-          <EnvelopeBar key={env.id} envelope={env} {...envelopeRemaining(state, env.id, mKey)} />
+          <EnvelopeBar key={env.id} envelope={env} {...envelopeRemaining(state, env.id, mKey)} compact />
         ))}
       </div>
 

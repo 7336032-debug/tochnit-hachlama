@@ -45,18 +45,20 @@ export default function BusinessPaceCard() {
         )}
 
         {shortfall && (
-          <div className="business-shortfall-note">
-            <p>
-              ⚠️ גם התרחיש השמרני נמוך מהיעד הדרוש לסילוק החוב החודשי ({money(shortfall.target)}) -
-              חסר בערך <b className="num">{money(shortfall.gap)}</b>.
-            </p>
-            <ul className="pace-actions">
-              <li>לשקול ימי עבודה נוספים החודש</li>
-              {actions.slice(0, 2).map((a) => (
-                <li key={a.id}>{a.text}</li>
-              ))}
-            </ul>
-          </div>
+          <details className="detail-toggle" open>
+            <summary>⚠️ גם התרחיש השמרני נמוך מהיעד - לפרטים</summary>
+            <div className="business-shortfall-note">
+              <p>
+                חסר בערך <b className="num">{money(shortfall.gap)}</b> כדי להגיע ליעד הדרוש לסילוק החוב החודשי ({money(shortfall.target)}).
+              </p>
+              <ul className="pace-actions">
+                <li>לשקול ימי עבודה נוספים החודש</li>
+                {actions.slice(0, 2).map((a) => (
+                  <li key={a.id}>{a.text}</li>
+                ))}
+              </ul>
+            </div>
+          </details>
         )}
       </div>
 

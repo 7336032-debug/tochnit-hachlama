@@ -1,0 +1,24 @@
+.snapshot-card {
+  padding: 16px 14px;
+}
+
+.snapshot-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  font-size: 14.5px;
+  margin-bottom: 14px;
+}
+.snapshot-banner-emoji { font-size: 18px; }
+.snapshot-banner-green { background: var(--green-bg); color: var(--green-strong); }
+.snapshot-banner-amber { background: var(--amber-bg); color: var(--amber); }
+.snapshot-banner-red { background: var(--red-bg); color: var(--red); }
+
+.snapshot-rings {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}

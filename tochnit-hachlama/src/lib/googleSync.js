@@ -8,7 +8,7 @@
 // Console (see Settings for instructions). Until GOOGLE_CLIENT_ID is set to
 // a real value, the sign-in UI stays disabled with an explanatory message.
 
-export const GOOGLE_CLIENT_ID = '__PENDING_GOOGLE_CLIENT_ID__';
+export const GOOGLE_CLIENT_ID = '43040986513-2nsjh844575p1pdf355qmds1jdk0t72a.apps.googleusercontent.com';
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 export const SYNC_FILE_NAME = 'hachlama-sync-v1.json';
 

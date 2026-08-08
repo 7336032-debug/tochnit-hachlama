@@ -17,6 +17,7 @@ import {
 
 const DataContext = createContext(null);
 const GOOGLE_SYNC_DEBOUNCE_MS = 2500;
+const GOOGLE_AUTO_PULL_INTERVAL_MS = 20000;
 
 function recompute(next) {
   next.behaviorProfile = computeBehaviorProfile(next);
@@ -135,15 +136,38 @@ export function DataProvider({ children }) {
 
   // debounced auto-push whenever data changes on a signed-in device
   const googlePushTimer = useRef(null);
+  const googlePushPending = useRef(false);
   useEffect(() => {
     if (!googleConfig) return undefined;
+    googlePushPending.current = true;
     if (googlePushTimer.current) clearTimeout(googlePushTimer.current);
     googlePushTimer.current = setTimeout(() => {
-      googlePushNow();
+      googlePushNow().finally(() => { googlePushPending.current = false; });
     }, GOOGLE_SYNC_DEBOUNCE_MS);
     return () => clearTimeout(googlePushTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, googleConfig]);
+
+  // periodic + on-return auto-pull, so changes made on another device show up
+  // here without needing a manual reload - skipped while a local edit is
+  // still waiting to be pushed, so it never clobbers unsaved local changes
+  useEffect(() => {
+    if (!googleConfig) return undefined;
+    const tryPull = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (googlePushPending.current) return;
+      googlePullNow(googleConfig.fileId, { silent: true });
+    };
+    document.addEventListener('visibilitychange', tryPull);
+    window.addEventListener('focus', tryPull);
+    const interval = setInterval(tryPull, GOOGLE_AUTO_PULL_INTERVAL_MS);
+    return () => {
+      document.removeEventListener('visibilitychange', tryPull);
+      window.removeEventListener('focus', tryPull);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleConfig]);
 
   const actions = useMemo(
     () => ({

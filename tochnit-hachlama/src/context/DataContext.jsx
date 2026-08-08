@@ -1,12 +1,22 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { loadState, saveState, newId, mergeWithDefaults } from '../lib/db.js';
 import { computeBehaviorProfile } from '../lib/behaviorProfile.js';
 import { computeStreakCount, nextShieldGrantAt } from '../lib/streak.js';
 import { computeNewlyAchieved } from '../lib/milestones.js';
 import { todayISO } from '../lib/format.js';
 import { encodeStateToCode, decodeCodeToState } from '../lib/exportImport.js';
+import { loadGoogleSyncConfig, saveGoogleSyncConfig, clearGoogleSyncConfig } from '../lib/googleSyncConfig.js';
+import {
+  requestAccessToken,
+  getValidAccessToken,
+  clearCachedToken,
+  findOrCreateSyncFileId,
+  readSyncFile,
+  writeSyncFile,
+} from '../lib/googleSync.js';
 
 const DataContext = createContext(null);
+const GOOGLE_SYNC_DEBOUNCE_MS = 2500;
 
 function recompute(next) {
   next.behaviorProfile = computeBehaviorProfile(next);
@@ -51,6 +61,89 @@ export function DataProvider({ children }) {
     const imported = decodeCodeToState(code);
     setState(recompute(mergeWithDefaults(imported)));
   }, []);
+
+  // ---------- automatic sync via the user's Google account ----------
+  const [googleConfig, setGoogleConfig] = useState(() => loadGoogleSyncConfig());
+  const [googleStatus, setGoogleStatus] = useState({ signedIn: !!loadGoogleSyncConfig(), syncing: false, lastSyncAt: null, error: null });
+
+  const googlePullNow = useCallback(async (fileId, { silent = false } = {}) => {
+    setGoogleStatus((s) => ({ ...s, syncing: true, error: null }));
+    try {
+      const token = silent ? await getValidAccessToken() : await requestAccessToken();
+      const remote = await readSyncFile(token, fileId);
+      if (remote) setState(recompute(mergeWithDefaults(remote)));
+      setGoogleStatus({ signedIn: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+      return true;
+    } catch (err) {
+      setGoogleStatus((s) => ({ ...s, syncing: false, error: err.message }));
+      return false;
+    }
+  }, []);
+
+  const googlePushNow = useCallback(async () => {
+    if (!googleConfig) return;
+    setGoogleStatus((s) => ({ ...s, syncing: true, error: null }));
+    try {
+      const token = await getValidAccessToken();
+      await writeSyncFile(token, googleConfig.fileId, state);
+      setGoogleStatus({ signedIn: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+    } catch (err) {
+      setGoogleStatus((s) => ({ ...s, syncing: false, error: err.message }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleConfig, state]);
+
+  const signInWithGoogle = useCallback(async () => {
+    setGoogleStatus((s) => ({ ...s, syncing: true, error: null }));
+    try {
+      const token = await requestAccessToken();
+      const fileId = await findOrCreateSyncFileId(token);
+      const config = { fileId };
+      saveGoogleSyncConfig(config);
+      setGoogleConfig(config);
+      const remote = await readSyncFile(token, fileId);
+      if (remote) {
+        setState(recompute(mergeWithDefaults(remote)));
+      } else {
+        await writeSyncFile(token, fileId, state);
+      }
+      setGoogleStatus({ signedIn: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+      return true;
+    } catch (err) {
+      setGoogleStatus((s) => ({ ...s, syncing: false, error: err.message }));
+      return false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const signOutGoogle = useCallback(() => {
+    clearCachedToken();
+    clearGoogleSyncConfig();
+    setGoogleConfig(null);
+    setGoogleStatus({ signedIn: false, syncing: false, lastSyncAt: null, error: null });
+  }, []);
+
+  // silent resume on app load if this device previously signed in
+  const resumedOnMount = useRef(false);
+  useEffect(() => {
+    if (googleConfig && !resumedOnMount.current) {
+      resumedOnMount.current = true;
+      googlePullNow(googleConfig.fileId, { silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // debounced auto-push whenever data changes on a signed-in device
+  const googlePushTimer = useRef(null);
+  useEffect(() => {
+    if (!googleConfig) return undefined;
+    if (googlePushTimer.current) clearTimeout(googlePushTimer.current);
+    googlePushTimer.current = setTimeout(() => {
+      googlePushNow();
+    }, GOOGLE_SYNC_DEBOUNCE_MS);
+    return () => clearTimeout(googlePushTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, googleConfig]);
 
   const actions = useMemo(
     () => ({
@@ -183,8 +276,12 @@ export function DataProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ state, ...actions, exportStateCode, importStateCode }),
-    [state, actions, exportStateCode, importStateCode],
+    () => ({
+      state, ...actions, exportStateCode, importStateCode,
+      googleStatus, signInWithGoogle, signOutGoogle, googlePushNow,
+      googlePullNow: () => googleConfig && googlePullNow(googleConfig.fileId),
+    }),
+    [state, actions, exportStateCode, importStateCode, googleStatus, signInWithGoogle, signOutGoogle, googlePushNow, googlePullNow, googleConfig],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

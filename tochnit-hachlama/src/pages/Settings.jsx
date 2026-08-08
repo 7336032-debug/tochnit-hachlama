@@ -4,6 +4,7 @@ import { exportAllToCsv } from '../lib/csvExport.js';
 import { effectiveRemainingInstallments } from '../lib/projections.js';
 import { todayISO } from '../lib/format.js';
 import SyncSection from '../components/SyncSection.jsx';
+import GoogleSyncPanel from '../components/GoogleSyncPanel.jsx';
 import './Settings.css';
 
 function Section({ title, emoji, children, defaultOpen }) {
@@ -38,6 +39,8 @@ export default function Settings() {
       </Section>
 
       <Section title="סנכרון בין מכשירים" emoji="☁️" defaultOpen>
+        <GoogleSyncPanel />
+        <div className="settings-divider" />
         <SyncSection />
       </Section>
 

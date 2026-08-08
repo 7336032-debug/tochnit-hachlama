@@ -14,6 +14,12 @@
 .settings-chevron { transition: transform 0.2s ease; color: var(--text-muted); }
 .settings-section[open] .settings-chevron { transform: rotate(90deg); }
 
+.settings-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
 .settings-section-body {
   padding: 0 16px 16px;
   border-top: 1px solid var(--border);

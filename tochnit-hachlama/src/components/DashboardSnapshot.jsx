@@ -41,7 +41,7 @@ export default function DashboardSnapshot() {
         <span>{banner.text}</span>
       </div>
       <div className="snapshot-rings">
-        <StatRing emoji="🏆" label="בריאות" ratio={healthRatio} displayValue={score} to="/reports" />
+        <StatRing emoji="🏆" label="עמידה בתוכנית" ratio={healthRatio} displayValue={score} to="/reports" />
         <StatRing emoji="💳" label="קצב חוב" ratio={debtRatio} displayValue={`${Math.round(debtRatio * 100)}%`} to="/debts" />
         <StatRing emoji="💅" label="קצב עסק" ratio={businessRatio} displayValue={`${Math.round(businessRatio * 100)}%`} to="/income-journal" />
         <StatRing emoji="🐷" label="חיסכון" ratio={savingsRatio} displayValue={`${Math.round(savingsRatio * 100)}%`} to="/entry" />

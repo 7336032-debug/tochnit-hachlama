@@ -27,7 +27,7 @@ export default function HealthGauge({ score }) {
       </svg>
       <div className="health-gauge-center">
         <div className="health-gauge-score" style={{ color }}>{score}</div>
-        <div className="health-gauge-label">בריאות היום</div>
+        <div className="health-gauge-label">עמידה בתוכנית</div>
       </div>
     </div>
   );

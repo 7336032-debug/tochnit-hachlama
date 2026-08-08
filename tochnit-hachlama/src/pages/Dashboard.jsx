@@ -4,6 +4,7 @@ import CoachCard from '../components/CoachCard.jsx';
 import HealthGauge from '../components/HealthGauge.jsx';
 import EnvelopeBar from '../components/EnvelopeBar.jsx';
 import BusinessPaceCard from '../components/BusinessPaceCard.jsx';
+import SavingsCard from '../components/SavingsCard.jsx';
 import {
   layer2Status,
   healthScore,
@@ -124,6 +125,9 @@ export default function Dashboard() {
           <EnvelopeBar key={env.id} envelope={env} {...envelopeRemaining(state, env.id, mKey)} />
         ))}
       </div>
+
+      <div className="section-title">🐷 חיסכון</div>
+      <SavingsCard />
     </div>
   );
 }

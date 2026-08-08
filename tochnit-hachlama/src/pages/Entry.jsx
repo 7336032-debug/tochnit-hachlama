@@ -5,10 +5,11 @@ import SwipeRow from '../components/SwipeRow.jsx';
 import Toast from '../components/Toast.jsx';
 import DailyIncomeForm from '../components/DailyIncomeForm.jsx';
 import { money, todayISO, humanDateShort } from '../lib/format.js';
-import { expenseCountedAmount } from '../lib/projections.js';
+import { expenseCountedAmount, totalSavingsBalance } from '../lib/projections.js';
 import './Entry.css';
 
 const QUICK_AMOUNTS = [20, 50, 100, 200, 350, 500];
+const SAVINGS_QUICK_AMOUNTS = [100, 200, 300, 500, 1000, 2000];
 const INCOME_SOURCES = [
   { id: 'business', label: 'עסק', emoji: '💅' },
   { id: 'rental', label: 'שכירות', emoji: '🏠' },
@@ -266,6 +267,56 @@ function DebtPaymentForm({ onSaved }) {
   );
 }
 
+function SavingsForm({ onSaved }) {
+  const { state, addSavingsEntry } = useData();
+  const [date, setDate] = useState(todayISO());
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const balance = totalSavingsBalance(state);
+
+  function submit(e) {
+    e.preventDefault();
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return;
+    addSavingsEntry({ date, amount: amt, note });
+    setAmount('');
+    setNote('');
+    onSaved();
+  }
+
+  return (
+    <form className="stack" onSubmit={submit}>
+      <p className="sync-hint">
+        יש לך כבר <b className="num">{money(balance)}</b> בחיסכון. אפשר לרשום כאן גם כסף עודף שנכנס החודש
+        וגם החלטה להעביר פחות להחזר ההלוואה ולשים את ההפרש כאן - בשני המקרים פשוט רשמי את הסכום ששמת בצד.
+      </p>
+
+      <label className="field-label" htmlFor="savings-amount">סכום לחיסכון</label>
+      <input
+        id="savings-amount"
+        className="amount-input"
+        type="number"
+        inputMode="decimal"
+        placeholder="0"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+      />
+      <div className="quick-amounts">
+        {SAVINGS_QUICK_AMOUNTS.map((v) => (
+          <button type="button" key={v} className="quick-amount-btn" onClick={() => setAmount(String(v))}>
+            {v} ₪
+          </button>
+        ))}
+      </div>
+
+      <input type="date" className="date-input" value={date} onChange={(e) => setDate(e.target.value)} max={todayISO()} />
+      <input className="note-input" placeholder="הערה (רשות)" value={note} onChange={(e) => setNote(e.target.value)} />
+
+      <button type="submit" className="btn btn-primary btn-lg btn-block">🐷 שמירת חיסכון</button>
+    </form>
+  );
+}
+
 function RecentExpenses() {
   const { state, updateExpense, deleteExpense } = useData();
   const recent = [...state.expenses].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
@@ -315,16 +366,18 @@ export default function Entry() {
 
   return (
     <div className="stack">
-      <div className="segmented entry-tabs">
+      <div className="segmented entry-tabs entry-tabs-4">
         <button type="button" className={tab === 'expense' ? 'active' : ''} onClick={() => setTab('expense')}>💸 הוצאה</button>
         <button type="button" className={tab === 'income' ? 'active' : ''} onClick={() => setTab('income')}>💰 הכנסה</button>
-        <button type="button" className={tab === 'payment' ? 'active' : ''} onClick={() => setTab('payment')}>💳 תשלום חוב</button>
+        <button type="button" className={tab === 'payment' ? 'active' : ''} onClick={() => setTab('payment')}>💳 חוב</button>
+        <button type="button" className={tab === 'savings' ? 'active' : ''} onClick={() => setTab('savings')}>🐷 חיסכון</button>
       </div>
 
       <div className="card">
         {tab === 'expense' && <ExpenseForm onSaved={trigger} />}
         {tab === 'income' && <IncomeForm onSaved={trigger} />}
         {tab === 'payment' && <DebtPaymentForm onSaved={trigger} />}
+        {tab === 'savings' && <SavingsForm onSaved={trigger} />}
       </div>
 
       <RecentExpenses />

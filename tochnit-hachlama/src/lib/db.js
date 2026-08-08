@@ -93,7 +93,6 @@ export function getDefaultState() {
     debtPayments: [],
     expenses: [],
     savingsEntries: [],
-    savingsBalance: 0,
     nudgeLog: [],
     behaviorProfile: {
       updatedAt: null,

@@ -213,9 +213,9 @@ export function DataProvider({ children }) {
       addSavingsEntry: ({ date, amount, note }) => {
         mutate((s) => {
           s.savingsEntries.push({ id: newId(), date, amount: Number(amount), note: note || '' });
-          s.savingsBalance = Math.round((s.savingsBalance + Number(amount)) * 100) / 100;
         });
       },
+      deleteSavingsEntry: (id) => mutate((s) => { s.savingsEntries = s.savingsEntries.filter((e) => e.id !== id); }),
 
       addDebt: (debt) => mutate((s) => { s.debts.push({ id: newId(), closed: false, closedDate: null, currentBalance: debt.openingBalance, accelerated: true, ...debt }); }),
       updateDebt: (id, patch) => mutate((s) => {

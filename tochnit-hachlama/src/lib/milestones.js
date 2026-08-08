@@ -48,6 +48,7 @@ function firstStepsMilestones() {
     { key: 'first_expense', emoji: '✍️', title: 'תיעדת את ההוצאה הראשונה שלך!', check: (s) => s.expenses.length >= 1 },
     { key: 'first_income', emoji: '💰', title: 'רשמת את ההכנסה הראשונה שלך!', check: (s) => s.incomeEntries.length >= 1 || s.dailyIncome.length >= 1 },
     { key: 'first_payment', emoji: '💳', title: 'ביצעת את התשלום הראשון לסילוק חוב!', check: (s) => s.debtPayments.length >= 1 },
+    { key: 'first_savings', emoji: '🐷', title: 'שמת בצד את החיסכון הראשון שלך!', check: (s) => s.savingsEntries.length >= 1 },
   ];
 }
 

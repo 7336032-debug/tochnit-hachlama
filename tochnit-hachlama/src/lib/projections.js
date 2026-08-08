@@ -58,6 +58,19 @@ export function monthDebtPayments(state, mKey) {
     .reduce((sum, p) => sum + p.amount, 0);
 }
 
+export function monthSavingsTotal(state, mKey) {
+  return state.savingsEntries
+    .filter((e) => monthKey(e.date) === mKey)
+    .reduce((sum, e) => sum + e.amount, 0);
+}
+
+// Derived from the ledger of entries (not a maintained running total), same
+// approach as debt balances - avoids the running-total ever drifting from
+// what's actually recorded, especially once entries can be deleted.
+export function totalSavingsBalance(state) {
+  return state.savingsEntries.reduce((sum, e) => sum + e.amount, 0);
+}
+
 export function monthImpulsiveVsPlanned(state, mKey) {
   let impulsive = 0;
   let planned = 0;

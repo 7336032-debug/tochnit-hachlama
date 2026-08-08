@@ -3,6 +3,7 @@ import { useData } from '../context/DataContext.jsx';
 import { exportAllToCsv } from '../lib/csvExport.js';
 import { effectiveRemainingInstallments } from '../lib/projections.js';
 import { todayISO } from '../lib/format.js';
+import SyncSection from '../components/SyncSection.jsx';
 import './Settings.css';
 
 function Section({ title, emoji, children, defaultOpen }) {
@@ -34,6 +35,10 @@ export default function Settings() {
           <button type="button" className={state.settings.theme === 'dark' ? 'active' : ''} onClick={() => updateSettings({ theme: 'dark' })}>🌙 כהה</button>
           <button type="button" className={state.settings.theme === 'system' ? 'active' : ''} onClick={() => updateSettings({ theme: 'system' })}>📱 אוטומטי</button>
         </div>
+      </Section>
+
+      <Section title="סנכרון בין מכשירים" emoji="☁️" defaultOpen>
+        <SyncSection />
       </Section>
 
       <Section title="למה חשוב לי לצאת מהחוב" emoji="💛">

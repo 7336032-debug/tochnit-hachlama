@@ -129,10 +129,18 @@ export function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return getDefaultState();
     const parsed = JSON.parse(raw);
-    return deepMerge(getDefaultState(), parsed);
+    return mergeWithDefaults(parsed);
   } catch {
     return getDefaultState();
   }
+}
+
+// Merges any externally-sourced state (e.g. pulled from cloud sync) over the
+// current schema's defaults, so a payload saved by an older app version
+// (missing newer fields) doesn't crash the app - same safety net loadState
+// gives locally-stored data.
+export function mergeWithDefaults(externalState) {
+  return deepMerge(getDefaultState(), externalState);
 }
 
 export function saveState(state) {

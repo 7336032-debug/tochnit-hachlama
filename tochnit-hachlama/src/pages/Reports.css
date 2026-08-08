@@ -1,0 +1,12 @@
+.impulsive-bar-track {
+  height: 18px;
+  border-radius: 999px;
+  background: var(--green-bg);
+  overflow: hidden;
+}
+.impulsive-bar-fill {
+  height: 100%;
+  background: var(--amber);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}

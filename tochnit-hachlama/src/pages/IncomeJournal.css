@@ -1,0 +1,115 @@
+.journal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.journal-title { font-weight: 800; font-size: 16px; }
+
+.journal-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.journal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+
+.journal-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.journal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.journal-cell {
+  aspect-ratio: 1;
+  min-height: 44px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--surface-alt);
+  font-size: 11px;
+}
+
+.journal-cell-blank { background: transparent; }
+
+.journal-cell-future { opacity: 0.35; }
+
+.journal-cell-noWork {
+  background: var(--surface-alt);
+  border: 1px dashed var(--border);
+}
+
+.journal-cell-zero {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.journal-cell-worked {
+  background: var(--green-bg);
+  color: var(--green-strong);
+}
+
+.journal-cell-today {
+  box-shadow: 0 0 0 2px var(--blue) inset;
+}
+
+.journal-daynum { font-weight: 800; font-size: 13px; }
+.journal-daytotal { font-size: 10px; font-weight: 700; }
+
+.journal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-inline-end: 4px;
+}
+.legend-worked { background: var(--green); }
+.legend-zero { background: var(--red); }
+.legend-noWork { background: var(--surface-alt); border: 1px dashed var(--border); }
+
+.journal-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 15, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 80;
+}
+
+.journal-modal {
+  width: 100%;
+  max-width: 480px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 18px 16px calc(24px + var(--safe-b));
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

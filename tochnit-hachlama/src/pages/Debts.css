@@ -1,0 +1,26 @@
+.chart-wrap {
+  margin-top: 12px;
+  margin-inline: -8px;
+}
+
+.debt-card { padding: 16px; }
+
+.debt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.debt-grid-label { font-size: 12px; margin-bottom: 2px; }
+
+.debt-dates {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  flex-wrap: wrap;
+}

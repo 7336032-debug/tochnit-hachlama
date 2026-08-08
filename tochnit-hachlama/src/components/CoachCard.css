@@ -1,0 +1,45 @@
+.coach-card {
+  display: flex;
+  gap: 12px;
+  background: linear-gradient(135deg, var(--blue-bg), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  align-items: flex-start;
+}
+
+.coach-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+}
+
+.coach-body { flex: 1; min-width: 0; }
+
+.coach-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--blue);
+  margin-bottom: 4px;
+}
+
+.coach-text {
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.coach-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coach-thanks { font-size: 13px; }

@@ -1,0 +1,66 @@
+.dashboard-top-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.dashboard-quick-stats {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quick-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.quick-stat-val { font-weight: 800; font-size: 15px; }
+
+.pace-gap-note {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.pace-gap-good { color: var(--green-strong); font-weight: 700; border-top: none; padding-top: 0; margin-top: 10px; }
+
+.pace-actions {
+  margin: 8px 0 0;
+  padding-inline-start: 20px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.freedom-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.freedom-numbers {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.freedom-total { font-size: 26px; font-weight: 900; }
+
+.freedom-pct-badge {
+  background: var(--blue-bg);
+  color: var(--blue);
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 16px;
+}

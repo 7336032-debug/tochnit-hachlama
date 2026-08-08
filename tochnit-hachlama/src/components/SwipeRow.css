@@ -1,0 +1,26 @@
+.swipe-row-outer {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.swipe-row-content {
+  position: relative;
+  background: var(--surface);
+  z-index: 1;
+  touch-action: pan-y;
+}
+
+.swipe-row-hint {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 0;
+}
+.swipe-row-hint-start { inset-inline-start: 0; color: var(--green-strong); background: var(--green-bg); }
+.swipe-row-hint-end { inset-inline-end: 0; color: var(--amber); background: var(--amber-bg); }

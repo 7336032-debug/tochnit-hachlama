@@ -1,0 +1,49 @@
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding-top: var(--safe-t);
+}
+
+.topbar-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+
+@media (min-width: 720px) {
+  .topbar-inner {
+    margin: 0;
+    margin-inline-start: calc(220px + 24px);
+    margin-inline-end: auto;
+    padding-inline-start: 14px;
+  }
+}
+
+.topbar-title {
+  font-weight: 800;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-streak {
+  min-height: 32px;
+}
+
+.topbar-settings {
+  font-size: 20px;
+}

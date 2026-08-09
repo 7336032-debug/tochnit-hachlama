@@ -14,10 +14,13 @@ import {
   readSyncFile,
   writeSyncFile,
 } from '../lib/googleSync.js';
+import { loadSupabaseSyncConfig, saveSupabaseSyncConfig, clearSupabaseSyncConfig } from '../lib/supabaseSyncConfig.js';
+import { generatePin, fetchHouseholdState, upsertHouseholdState, subscribeToHouseholdChanges } from '../lib/supabaseSync.js';
 
 const DataContext = createContext(null);
 const GOOGLE_SYNC_DEBOUNCE_MS = 2500;
 const GOOGLE_AUTO_PULL_INTERVAL_MS = 20000;
+const SUPABASE_SYNC_DEBOUNCE_MS = 1500;
 
 function recompute(next) {
   next.behaviorProfile = computeBehaviorProfile(next);
@@ -169,6 +172,85 @@ export function DataProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleConfig]);
 
+  // ---------- automatic sync via a shared Supabase household code ----------
+  const [supabaseConfig, setSupabaseConfig] = useState(() => loadSupabaseSyncConfig());
+  const [supabaseStatus, setSupabaseStatus] = useState({
+    connected: !!loadSupabaseSyncConfig(),
+    syncing: false,
+    lastSyncAt: null,
+    error: null,
+  });
+
+  const connectSupabase = useCallback(async (pin) => {
+    const cleanPin = (pin || '').trim().toUpperCase();
+    if (!cleanPin) return false;
+    setSupabaseStatus((s) => ({ ...s, syncing: true, error: null }));
+    try {
+      const remote = await fetchHouseholdState(cleanPin);
+      if (remote) {
+        setState(recompute(mergeWithDefaults(remote)));
+      } else {
+        await upsertHouseholdState(cleanPin, state);
+      }
+      const config = { pin: cleanPin };
+      saveSupabaseSyncConfig(config);
+      setSupabaseConfig(config);
+      setSupabaseStatus({ connected: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+      return true;
+    } catch (err) {
+      setSupabaseStatus((s) => ({ ...s, syncing: false, error: err.message }));
+      return false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const createHousehold = useCallback(() => connectSupabase(generatePin()), [connectSupabase]);
+
+  const disconnectSupabase = useCallback(() => {
+    clearSupabaseSyncConfig();
+    setSupabaseConfig(null);
+    setSupabaseStatus({ connected: false, syncing: false, lastSyncAt: null, error: null });
+  }, []);
+
+  const supabasePushNow = useCallback(async () => {
+    if (!supabaseConfig) return;
+    setSupabaseStatus((s) => ({ ...s, syncing: true, error: null }));
+    try {
+      await upsertHouseholdState(supabaseConfig.pin, state);
+      setSupabaseStatus({ connected: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+    } catch (err) {
+      setSupabaseStatus((s) => ({ ...s, syncing: false, error: err.message }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseConfig, state]);
+
+  // debounced auto-push whenever data changes on a connected device
+  const supabasePushTimer = useRef(null);
+  const supabasePushPending = useRef(false);
+  useEffect(() => {
+    if (!supabaseConfig) return undefined;
+    supabasePushPending.current = true;
+    if (supabasePushTimer.current) clearTimeout(supabasePushTimer.current);
+    supabasePushTimer.current = setTimeout(() => {
+      supabasePushNow().finally(() => { supabasePushPending.current = false; });
+    }, SUPABASE_SYNC_DEBOUNCE_MS);
+    return () => clearTimeout(supabasePushTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, supabaseConfig]);
+
+  // realtime subscription - changes made on another device arrive over a
+  // websocket within moments, no polling needed. Skipped while a local edit
+  // is still queued to push, so it can't clobber unsaved local changes.
+  useEffect(() => {
+    if (!supabaseConfig) return undefined;
+    const unsubscribe = subscribeToHouseholdChanges(supabaseConfig.pin, (remoteData) => {
+      if (supabasePushPending.current) return;
+      setState(recompute(mergeWithDefaults(remoteData)));
+      setSupabaseStatus({ connected: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+    });
+    return unsubscribe;
+  }, [supabaseConfig]);
+
   const actions = useMemo(
     () => ({
       addIncome: ({ date, source, amount, note }) => {
@@ -304,8 +386,13 @@ export function DataProvider({ children }) {
       state, ...actions, exportStateCode, importStateCode,
       googleStatus, signInWithGoogle, signOutGoogle, googlePushNow,
       googlePullNow: () => googleConfig && googlePullNow(googleConfig.fileId),
+      supabaseConfig, supabaseStatus, createHousehold, connectSupabase, disconnectSupabase, supabasePushNow,
     }),
-    [state, actions, exportStateCode, importStateCode, googleStatus, signInWithGoogle, signOutGoogle, googlePushNow, googlePullNow, googleConfig],
+    [
+      state, actions, exportStateCode, importStateCode,
+      googleStatus, signInWithGoogle, signOutGoogle, googlePushNow, googlePullNow, googleConfig,
+      supabaseConfig, supabaseStatus, createHousehold, connectSupabase, disconnectSupabase, supabasePushNow,
+    ],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

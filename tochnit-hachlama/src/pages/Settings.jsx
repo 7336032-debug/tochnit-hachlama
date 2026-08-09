@@ -5,6 +5,7 @@ import { effectiveRemainingInstallments, fixedCostsTotalByType, activeEnvelopes 
 import { money, todayISO } from '../lib/format.js';
 import SyncSection from '../components/SyncSection.jsx';
 import GoogleSyncPanel from '../components/GoogleSyncPanel.jsx';
+import SupabaseSyncPanel from '../components/SupabaseSyncPanel.jsx';
 import './Settings.css';
 
 function Section({ title, emoji, children, defaultOpen }) {
@@ -41,7 +42,11 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="סנכרון בין מכשירים" emoji="☁️" defaultOpen>
+      <Section title="סנכרון מיידי (חדש - בבדיקה)" emoji="⚡" defaultOpen>
+        <SupabaseSyncPanel />
+      </Section>
+
+      <Section title="סנכרון בין מכשירים" emoji="☁️">
         <GoogleSyncPanel />
         <div className="settings-divider" />
         <SyncSection />

@@ -3,8 +3,8 @@
 // one-time Supabase project setup (see Settings for instructions).
 import { createClient } from '@supabase/supabase-js';
 
-export const SUPABASE_URL = '__PENDING_SUPABASE_URL__';
-export const SUPABASE_ANON_KEY = '__PENDING_SUPABASE_ANON_KEY__';
+export const SUPABASE_URL = 'https://zmosgennriwcdkvgafqt.supabase.co';
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptb3NnZW5ucml3Y2RrdmdhZnF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTQxMTAsImV4cCI6MjEwMTY5MDExMH0.FYDnYBUQHUBil1b6hy9e-DfRnr6ITKhvQKp7IRg-z1M';
 export const SYNC_TABLE = 'sync_state';
 
 export function isSupabaseConfigured() {

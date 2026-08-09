@@ -7,6 +7,7 @@ import {
   healthScore,
   expenseCountedAmount,
   envelopeRemaining,
+  activeEnvelopes,
 } from '../lib/projections.js';
 import { money, todayISO, monthKey, addMonthsISO, humanMonthYear, pct } from '../lib/format.js';
 import './Reports.css';
@@ -51,9 +52,9 @@ function WeeklyReport() {
         </p>
       </div>
 
-      <div className="section-title">💌 הוצאות השבוע לפי מעטפת</div>
+      <div className="section-title">💌 הוצאות השבוע לפי קטגוריה</div>
       <div className="stack">
-        {state.envelopes.map((env) => {
+        {activeEnvelopes(state).map((env) => {
           const spentWeek = weekByEnvelope[env.id] || 0;
           const monthly = envelopeRemaining(state, env.id, mKey);
           return (
@@ -82,7 +83,7 @@ function MonthlyReport() {
   const prev = monthImpulsiveVsPlanned(state, prevKey);
   const score = healthScore(state, mKey);
   const impulsiveShare = pct(current.impulsive, current.total || 1);
-  const overBudgetCount = state.envelopes.filter((e) => envelopeRemaining(state, e.id, mKey).pct >= 100).length;
+  const overBudgetCount = activeEnvelopes(state).filter((e) => envelopeRemaining(state, e.id, mKey).pct >= 100).length;
 
   return (
     <div className="stack">
@@ -94,7 +95,7 @@ function MonthlyReport() {
             {score >= 8 ? 'חודש מצוין! 🎉' : score >= 5 ? 'חודש סביר, יש לאן להשתפר' : 'חודש מאתגר - זה בסדר, מחר יום חדש'}
           </div>
           {overBudgetCount > 0 && (
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{overBudgetCount} מעטפות חרגו החודש</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{overBudgetCount} קטגוריות חרגו החודש</div>
           )}
         </div>
       </div>

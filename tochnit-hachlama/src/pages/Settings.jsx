@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext.jsx';
 import { exportAllToCsv } from '../lib/csvExport.js';
-import { effectiveRemainingInstallments } from '../lib/projections.js';
-import { todayISO } from '../lib/format.js';
+import { effectiveRemainingInstallments, fixedCostsTotalByType, activeEnvelopes } from '../lib/projections.js';
+import { money, todayISO } from '../lib/format.js';
 import SyncSection from '../components/SyncSection.jsx';
 import GoogleSyncPanel from '../components/GoogleSyncPanel.jsx';
 import './Settings.css';
@@ -27,6 +27,9 @@ export default function Settings() {
   } = useData();
   const [newEnvName, setNewEnvName] = useState('');
   const [newFixedName, setNewFixedName] = useState('');
+  const [newFixedType, setNewFixedType] = useState('home');
+  const homeCosts = state.fixedCosts.filter((c) => c.type === 'home');
+  const personalCosts = state.fixedCosts.filter((c) => c.type === 'personal');
 
   return (
     <div className="stack">
@@ -53,8 +56,8 @@ export default function Settings() {
         />
       </Section>
 
-      <Section title="מעטפות (שכבה 3)" emoji="💌" defaultOpen>
-        {state.envelopes.map((env) => (
+      <Section title="הוצאות לא קבועות (שכבה 3)" emoji="💌" defaultOpen>
+        {activeEnvelopes(state).map((env) => (
           <div className="settings-row" key={env.id}>
             <span className="settings-row-emoji">{env.emoji}</span>
             <input
@@ -72,7 +75,7 @@ export default function Settings() {
           </div>
         ))}
         <div className="settings-add-row">
-          <input className="settings-text-input" placeholder="שם מעטפת חדשה" value={newEnvName} onChange={(e) => setNewEnvName(e.target.value)} />
+          <input className="settings-text-input" placeholder="שם הוצאה חדשה" value={newEnvName} onChange={(e) => setNewEnvName(e.target.value)} />
           <button
             type="button"
             className="btn btn-secondary"
@@ -83,26 +86,58 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="הוצאות קבועות (שכבה 1)" emoji="🏠">
-        {state.fixedCosts.map((c) => (
-          <div className="settings-row" key={c.id}>
-            <span className="settings-row-emoji">{c.emoji}</span>
-            <input className="settings-text-input" defaultValue={c.name} onBlur={(e) => updateFixedCost(c.id, { name: e.target.value })} />
-            <input
-              type="number"
-              className="settings-number-input"
-              defaultValue={c.amount}
-              onBlur={(e) => updateFixedCost(c.id, { amount: Number(e.target.value) || 0 })}
-            />
-            <button type="button" className="icon-btn" onClick={() => deleteFixedCost(c.id)}>🗑️</button>
+      <Section title="הוצאות קבועות" emoji="🏠" defaultOpen>
+        <div className="fixed-costs-group">
+          <div className="fixed-costs-group-title">
+            <span>🏠 בית</span>
+            <span className="muted num">{money(fixedCostsTotalByType(state, 'home'))}</span>
           </div>
-        ))}
+          {homeCosts.map((c) => (
+            <div className="settings-row" key={c.id}>
+              <span className="settings-row-emoji">{c.emoji}</span>
+              <input className="settings-text-input" defaultValue={c.name} onBlur={(e) => updateFixedCost(c.id, { name: e.target.value })} />
+              <input
+                type="number"
+                className="settings-number-input"
+                defaultValue={c.amount}
+                onBlur={(e) => updateFixedCost(c.id, { amount: Number(e.target.value) || 0 })}
+              />
+              <button type="button" className="icon-btn" onClick={() => deleteFixedCost(c.id)}>🗑️</button>
+            </div>
+          ))}
+        </div>
+        <div className="fixed-costs-group">
+          <div className="fixed-costs-group-title">
+            <span>🙋 אישי</span>
+            <span className="muted num">{money(fixedCostsTotalByType(state, 'personal'))}</span>
+          </div>
+          {personalCosts.map((c) => (
+            <div className="settings-row" key={c.id}>
+              <span className="settings-row-emoji">{c.emoji}</span>
+              <input className="settings-text-input" defaultValue={c.name} onBlur={(e) => updateFixedCost(c.id, { name: e.target.value })} />
+              <input
+                type="number"
+                className="settings-number-input"
+                defaultValue={c.amount}
+                onBlur={(e) => updateFixedCost(c.id, { amount: Number(e.target.value) || 0 })}
+              />
+              <button type="button" className="icon-btn" onClick={() => deleteFixedCost(c.id)}>🗑️</button>
+            </div>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12.5 }}>
+          תשלומי המינימום להלוואות מנוהלים בנפרד במסך "חובות" למטה - הם לא נספרים כאן כדי לא לספור אותם פעמיים.
+        </p>
         <div className="settings-add-row">
+          <select className="settings-text-input" value={newFixedType} onChange={(e) => setNewFixedType(e.target.value)} style={{ flex: '0 0 90px' }}>
+            <option value="home">בית</option>
+            <option value="personal">אישי</option>
+          </select>
           <input className="settings-text-input" placeholder="הוצאה קבועה חדשה" value={newFixedName} onChange={(e) => setNewFixedName(e.target.value)} />
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => { if (newFixedName.trim()) { addFixedCost({ emoji: '📌', name: newFixedName.trim(), amount: 0 }); setNewFixedName(''); } }}
+            onClick={() => { if (newFixedName.trim()) { addFixedCost({ emoji: '📌', type: newFixedType, name: newFixedName.trim(), amount: 0 }); setNewFixedName(''); } }}
           >
             + הוספה
           </button>

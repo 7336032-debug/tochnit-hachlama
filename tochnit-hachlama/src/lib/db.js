@@ -17,13 +17,24 @@ export const NUDGE_TECHNIQUES = [
 
 function defaultFixedCosts() {
   return [
-    { id: 'fc-house', emoji: '🏠', name: 'חלק בהוצאות הבית המשותף', amount: 13200 },
-    { id: 'fc-mortgage', emoji: '🏠', name: 'משכנתא', amount: 4000 },
-    { id: 'fc-insurance', emoji: '🛡️', name: 'ביטוחים + ביטוח לאומי + קופת חולים', amount: 4211 },
-    { id: 'fc-pension', emoji: '🎓', name: 'קרן השתלמות + קופת גמל', amount: 1500 },
-    { id: 'fc-phone-biz', emoji: '📱', name: 'טלפון + עסק שוטף', amount: 1443 },
-    { id: 'fc-studies', emoji: '📚', name: 'לימודים', amount: 1200 },
-    { id: 'fc-min-debts', emoji: '💳', name: 'מינימום חודשי לחובות (בנק + חוץ-בנקאית)', amount: 3200 },
+    // home (split with spouse, already halved into these amounts)
+    { id: 'fc-rent', type: 'home', emoji: '🏠', name: 'שכירות', amount: 5000 },
+    { id: 'fc-taxes', type: 'home', emoji: '🧾', name: 'מיסים (ארנונה+ועד בית+טלוויזיה+חשמל+גז+מים)', amount: 2600 },
+    { id: 'fc-cleaning', type: 'home', emoji: '🧹', name: 'ניקיון', amount: 1000 },
+    { id: 'fc-ironing', type: 'home', emoji: '👕', name: 'גיהוץ', amount: 400 },
+    { id: 'fc-groceries', type: 'home', emoji: '🛒', name: 'קניות בית/מזון', amount: 3000 },
+    { id: 'fc-fun', type: 'home', emoji: '🎉', name: 'בילויים', amount: 800 },
+    { id: 'fc-fun-family', type: 'home', emoji: '👨‍👩‍👧', name: 'בילויים משפחתיים מורחב', amount: 400 },
+    // personal
+    { id: 'fc-insurance', type: 'personal', emoji: '🛡️', name: 'ביטוחים', amount: 2373 },
+    { id: 'fc-national-insurance', type: 'personal', emoji: '🏛️', name: 'ביטוח לאומי', amount: 1538 },
+    { id: 'fc-pension-fund', type: 'personal', emoji: '🎓', name: 'קרן השתלמות', amount: 1000 },
+    { id: 'fc-provident', type: 'personal', emoji: '💼', name: 'קופת גמל', amount: 500 },
+    { id: 'fc-healthcare', type: 'personal', emoji: '⚕️', name: 'קופת חולים', amount: 300 },
+    { id: 'fc-phone', type: 'personal', emoji: '📱', name: 'טלפון', amount: 150 },
+    { id: 'fc-studies', type: 'personal', emoji: '📚', name: 'לימודים', amount: 1200 },
+    { id: 'fc-mortgage', type: 'personal', emoji: '🏘️', name: 'משכנתא (דירת ההשקעה המושכרת)', amount: 4000 },
+    { id: 'fc-biz-running', type: 'personal', emoji: '💅', name: 'הוצאות עסק שוטפות (כולל סליקה)', amount: 1293 },
   ];
 }
 
@@ -31,10 +42,41 @@ function defaultEnvelopes() {
   return [
     { id: 'env-cosmetics', emoji: '💅', name: 'קוסמטיקה / עסק', monthlyBudget: 0, needsSetup: true },
     { id: 'env-clothing', emoji: '👗', name: 'ביגוד', monthlyBudget: 0, needsSetup: true },
-    { id: 'env-fun', emoji: '🎉', name: 'בילויים', monthlyBudget: 800 },
-    { id: 'env-subs', emoji: '📱', name: 'מנויים', monthlyBudget: 300, needsReview: true },
+    { id: 'env-subs', emoji: '📱', name: 'מנויים', monthlyBudget: 631, needsReview: true },
     { id: 'env-misc', emoji: '🎲', name: 'שונות / בלתי צפוי', monthlyBudget: 600 },
   ];
+}
+
+// One-time restructure from the old flat fixed-costs list (single "house
+// share" line + a redundant debt-minimum line double-counted against the
+// layer2 target) and from envelopes that included "בילויים" (now a fixed
+// cost, since it's budgeted every month regardless). Runs on every load so
+// data pulled from another device/sync gets the same shape; a no-op once a
+// state is already on the new structure.
+function migrateExpenseStructure(state) {
+  let fixedCosts = state.fixedCosts;
+  if (fixedCosts.some((c) => !c.type)) {
+    fixedCosts = defaultFixedCosts();
+  }
+  let envelopes = state.envelopes;
+  if (envelopes.some((e) => e.id === 'env-fun')) {
+    // בילויים moved to a fixed cost. If old expense records still point at
+    // it, keep it around archived (name/emoji intact for those lookups)
+    // instead of dropping it - a hard delete would turn those records into
+    // unresolvable "לא ידוע" entries.
+    const hasHistory = (state.expenses || []).some((e) => e.categoryType === 'envelope' && e.categoryId === 'env-fun');
+    envelopes = envelopes
+      .map((e) => {
+        if (e.id !== 'env-fun') {
+          return e.id === 'env-subs' && e.monthlyBudget === 300 ? { ...e, monthlyBudget: 631 } : e;
+        }
+        return hasHistory ? { ...e, monthlyBudget: 0, archived: true } : null;
+      })
+      .filter(Boolean);
+  }
+  return fixedCosts === state.fixedCosts && envelopes === state.envelopes
+    ? state
+    : { ...state, fixedCosts, envelopes };
 }
 
 function defaultDebts() {
@@ -139,7 +181,7 @@ export function loadState() {
 // (missing newer fields) doesn't crash the app - same safety net loadState
 // gives locally-stored data.
 export function mergeWithDefaults(externalState) {
-  return deepMerge(getDefaultState(), externalState);
+  return migrateExpenseStructure(deepMerge(getDefaultState(), externalState));
 }
 
 export function saveState(state) {

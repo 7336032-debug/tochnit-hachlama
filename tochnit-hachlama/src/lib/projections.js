@@ -22,6 +22,17 @@ export function layer1Total(state) {
   return fixed + activeTempCommitmentsTotal(state);
 }
 
+export function fixedCostsTotalByType(state, type) {
+  return state.fixedCosts.filter((c) => c.type === type).reduce((sum, c) => sum + c.amount, 0);
+}
+
+// Envelopes retired (e.g. by the fixed-cost restructure) but kept in state
+// so old expense records can still resolve their name - excluded from any
+// UI that lists categories to budget/log against.
+export function activeEnvelopes(state) {
+  return state.envelopes.filter((e) => !e.archived);
+}
+
 export function monthIncome(state, mKey) {
   const fromEntries = state.incomeEntries
     .filter((e) => monthKey(e.date) === mKey)
@@ -110,14 +121,14 @@ export function suggestedActionsForGap(state, gap, mKey) {
       covers: Math.min(gap, savingsTarget),
     });
   }
-  const envStatuses = state.envelopes
+  const envStatuses = activeEnvelopes(state)
     .map((env) => ({ env, ...envelopeRemaining(state, env.id, mKey) }))
     .filter((s) => s.remaining > 0)
     .sort((a, b) => b.remaining - a.remaining);
   for (const s of envStatuses) {
     actions.push({
       id: `trim-${s.env.id}`,
-      text: `לצמצם את מעטפת ${s.env.emoji} ${s.env.name} - נשארו בה ${Math.round(s.remaining)} ₪ שאפשר להעביר`,
+      text: `לצמצם ב-${s.env.emoji} ${s.env.name} - נשארו בה ${Math.round(s.remaining)} ₪ שאפשר להעביר`,
       covers: Math.min(gap, s.remaining),
     });
   }
@@ -296,7 +307,7 @@ export function healthScore(state, mKey = monthKey(todayISO())) {
   if (status.hasIncome && status.gap > 0) {
     score -= status.gap > 2000 ? 3 : 1.5;
   }
-  const overBudgetEnvelopes = state.envelopes.filter((e) => envelopeRemaining(state, e.id, mKey).pct > 100);
+  const overBudgetEnvelopes = activeEnvelopes(state).filter((e) => envelopeRemaining(state, e.id, mKey).pct > 100);
   score -= overBudgetEnvelopes.length * 1.2;
   const { impulsive, total } = monthImpulsiveVsPlanned(state, mKey);
   if (total > 0) {

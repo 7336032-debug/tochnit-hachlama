@@ -5,7 +5,7 @@ import SwipeRow from '../components/SwipeRow.jsx';
 import Toast from '../components/Toast.jsx';
 import DailyIncomeForm from '../components/DailyIncomeForm.jsx';
 import { money, todayISO, humanDateShort } from '../lib/format.js';
-import { expenseCountedAmount, totalSavingsBalance } from '../lib/projections.js';
+import { expenseCountedAmount, totalSavingsBalance, activeEnvelopes } from '../lib/projections.js';
 import './Entry.css';
 
 const QUICK_AMOUNTS = [20, 50, 100, 200, 350, 500];
@@ -30,7 +30,7 @@ function ExpenseForm({ onSaved }) {
   const { state, addExpense } = useData();
   const [date, setDate] = useState(todayISO());
   const [useFixed, setUseFixed] = useState(false);
-  const list = useFixed ? state.fixedCosts : state.envelopes;
+  const list = useFixed ? state.fixedCosts : activeEnvelopes(state);
   const [categoryId, setCategoryId] = useState(list[0]?.id);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -39,7 +39,7 @@ function ExpenseForm({ onSaved }) {
 
   function pickList(nextUseFixed) {
     setUseFixed(nextUseFixed);
-    const nextList = nextUseFixed ? state.fixedCosts : state.envelopes;
+    const nextList = nextUseFixed ? state.fixedCosts : activeEnvelopes(state);
     setCategoryId(nextList[0]?.id);
   }
 
@@ -61,7 +61,7 @@ function ExpenseForm({ onSaved }) {
   return (
     <form className="stack" onSubmit={submit}>
       <div className="segmented">
-        <button type="button" className={!useFixed ? 'active' : ''} onClick={() => pickList(false)}>💌 מעטפת</button>
+        <button type="button" className={!useFixed ? 'active' : ''} onClick={() => pickList(false)}>💌 הוצאה משתנה</button>
         <button type="button" className={useFixed ? 'active' : ''} onClick={() => pickList(true)}>🏠 הוצאה קבועה</button>
       </div>
 

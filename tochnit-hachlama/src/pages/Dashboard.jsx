@@ -13,6 +13,7 @@ import {
   projectedFreedomDateISO,
   envelopeRemaining,
   suggestedActionsForGap,
+  activeEnvelopes,
 } from '../lib/projections.js';
 import { money, monthKey, todayISO, humanDate, humanMonthYear, clamp } from '../lib/format.js';
 import './Dashboard.css';
@@ -31,6 +32,7 @@ export default function Dashboard() {
   const paceColor = paceRatio >= 1 ? 'green' : paceRatio >= 0.6 ? 'amber' : 'red';
   const paceColorVar = paceRatio >= 1 ? 'var(--green)' : paceRatio >= 0.6 ? 'var(--amber)' : 'var(--red)';
   const isShortfall = status.hasIncome && status.gap > 0 && status.paidToDebtThisMonth < status.target;
+  const remainingForVariable = status.surplus - status.target;
 
   return (
     <div className="stack">
@@ -48,9 +50,13 @@ export default function Dashboard() {
           <div className="num month-stat-val">{money(status.layer1)}</div>
         </div>
         <div className="month-stat">
-          <div className="muted">{status.surplus >= 0 ? '✅ עודף' : '🚨 גירעון'}</div>
-          <div className="num month-stat-val" style={{ color: status.surplus >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {money(status.surplus)}
+          <div className="muted">💪 סילוק חוב</div>
+          <div className="num month-stat-val">{money(status.target)}</div>
+        </div>
+        <div className="month-stat">
+          <div className="muted">{remainingForVariable >= 0 ? '✅ נשאר' : '🚨 גירעון'}</div>
+          <div className="num month-stat-val" style={{ color: remainingForVariable >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {money(remainingForVariable)}
           </div>
         </div>
       </div>
@@ -120,9 +126,9 @@ export default function Dashboard() {
         </div>
       </Link>
 
-      <div className="section-title">💌 המעטפות שלך החודש</div>
+      <div className="section-title">💌 הוצאות לא קבועות החודש</div>
       <div className="stack">
-        {state.envelopes.map((env) => (
+        {activeEnvelopes(state).map((env) => (
           <EnvelopeBar key={env.id} envelope={env} {...envelopeRemaining(state, env.id, mKey)} compact />
         ))}
       </div>

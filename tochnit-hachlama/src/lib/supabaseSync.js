@@ -1,11 +1,17 @@
-// Realtime cross-device sync via Supabase - a shared "household code" (PIN)
+// Cross-device sync via Supabase - a shared "household code" (PIN)
 // identifies the family's row, no sign-in screen or popups. Requires a
 // one-time Supabase project setup (see Settings for instructions).
+//
+// The app never talks to the sync_state table directly - only through
+// SECURITY DEFINER functions gated by the PIN (see
+// supabase/migrations/001_secure_sync_state.sql). Realtime postgres_changes
+// subscriptions require open SELECT access via RLS, which is exactly what
+// those functions exist to avoid - so updates are delivered by fast polling
+// instead of a websocket push (see SUPABASE_POLL_INTERVAL_MS in DataContext).
 import { createClient } from '@supabase/supabase-js';
 
 export const SUPABASE_URL = 'https://zmosgennriwcdkvgafqt.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptb3NnZW5ucml3Y2RrdmdhZnF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTQxMTAsImV4cCI6MjEwMTY5MDExMH0.FYDnYBUQHUBil1b6hy9e-DfRnr6ITKhvQKp7IRg-z1M';
-export const SYNC_TABLE = 'sync_state';
 
 export function isSupabaseConfigured() {
   return (
@@ -31,35 +37,29 @@ function getClient() {
 
 function mapError(error) {
   if (!error) return 'שגיאה לא ידועה';
+  if (error.message?.includes('קוד לא תקין')) return 'קוד משפחה שגוי';
   if (error.message?.includes('Failed to fetch')) return 'אין חיבור לאינטרנט - בדקי את הרשת ונסי שוב';
   return `שגיאת Supabase: ${error.message}`;
 }
 
-export async function fetchHouseholdState(pin) {
-  const { data, error } = await getClient().from(SYNC_TABLE).select('data').eq('id', pin).maybeSingle();
+// Atomic connect-or-create: if no household exists yet for this pin, it's
+// created seeded with initialData; if one already exists, initialData is
+// ignored and the existing data is returned - so the same call safely
+// covers both "first device" and "joining device" without a race between
+// separate fetch + create calls.
+export async function connectOrCreateHousehold(pin, initialData) {
+  const { data, error } = await getClient().rpc('household_connect', { p_pin: pin, p_initial_data: initialData ?? {} });
   if (error) throw new Error(mapError(error));
-  return data ? data.data : null;
+  return data;
+}
+
+export async function fetchHouseholdState(pin) {
+  const { data, error } = await getClient().rpc('household_fetch', { p_pin: pin });
+  if (error) throw new Error(mapError(error));
+  return data;
 }
 
 export async function upsertHouseholdState(pin, stateData) {
-  const { error } = await getClient()
-    .from(SYNC_TABLE)
-    .upsert({ id: pin, data: stateData, updated_at: new Date().toISOString() });
+  const { error } = await getClient().rpc('household_upsert', { p_pin: pin, p_data: stateData });
   if (error) throw new Error(mapError(error));
-}
-
-// Subscribes to realtime changes on this household's row. Returns an
-// unsubscribe function. onChange receives the new full state object.
-export function subscribeToHouseholdChanges(pin, onChange) {
-  const channel = getClient()
-    .channel(`sync_state_${pin}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: SYNC_TABLE, filter: `id=eq.${pin}` },
-      (payload) => {
-        if (payload.new && payload.new.data) onChange(payload.new.data);
-      },
-    )
-    .subscribe();
-  return () => getClient().removeChannel(channel);
 }

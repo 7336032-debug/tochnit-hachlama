@@ -15,12 +15,14 @@ import {
   writeSyncFile,
 } from '../lib/googleSync.js';
 import { loadSupabaseSyncConfig, saveSupabaseSyncConfig, clearSupabaseSyncConfig } from '../lib/supabaseSyncConfig.js';
-import { generatePin, fetchHouseholdState, upsertHouseholdState, subscribeToHouseholdChanges } from '../lib/supabaseSync.js';
+import { generatePin, connectOrCreateHousehold, fetchHouseholdState, upsertHouseholdState } from '../lib/supabaseSync.js';
 
 const DataContext = createContext(null);
 const GOOGLE_SYNC_DEBOUNCE_MS = 2500;
 const GOOGLE_AUTO_PULL_INTERVAL_MS = 20000;
 const SUPABASE_SYNC_DEBOUNCE_MS = 1500;
+// No realtime websocket here (see supabaseSync.js) - fast polling instead
+const SUPABASE_POLL_INTERVAL_MS = 4000;
 
 function recompute(next) {
   next.behaviorProfile = computeBehaviorProfile(next);
@@ -186,12 +188,11 @@ export function DataProvider({ children }) {
     if (!cleanPin) return false;
     setSupabaseStatus((s) => ({ ...s, syncing: true, error: null }));
     try {
-      const remote = await fetchHouseholdState(cleanPin);
-      if (remote) {
-        setState(recompute(mergeWithDefaults(remote)));
-      } else {
-        await upsertHouseholdState(cleanPin, state);
-      }
+      // atomic: creates the household seeded with local state if this pin
+      // is new, or returns the existing household's data if it already
+      // exists - no separate fetch-then-maybe-create race
+      const remote = await connectOrCreateHousehold(cleanPin, state);
+      setState(recompute(mergeWithDefaults(remote)));
       const config = { pin: cleanPin };
       saveSupabaseSyncConfig(config);
       setSupabaseConfig(config);
@@ -238,17 +239,32 @@ export function DataProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, supabaseConfig]);
 
-  // realtime subscription - changes made on another device arrive over a
-  // websocket within moments, no polling needed. Skipped while a local edit
-  // is still queued to push, so it can't clobber unsaved local changes.
+  // Fast polling instead of a realtime websocket - the secure RPC functions
+  // (see supabaseSync.js) don't allow direct table SELECT, which is what
+  // postgres_changes subscriptions require. Skipped while a local edit is
+  // still queued to push, so it can't clobber unsaved local changes.
   useEffect(() => {
     if (!supabaseConfig) return undefined;
-    const unsubscribe = subscribeToHouseholdChanges(supabaseConfig.pin, (remoteData) => {
+    const tryPull = async () => {
+      if (document.visibilityState !== 'visible') return;
       if (supabasePushPending.current) return;
-      setState(recompute(mergeWithDefaults(remoteData)));
-      setSupabaseStatus({ connected: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-    });
-    return unsubscribe;
+      try {
+        const remote = await fetchHouseholdState(supabaseConfig.pin);
+        setState(recompute(mergeWithDefaults(remote)));
+        setSupabaseStatus({ connected: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
+      } catch (err) {
+        setSupabaseStatus((s) => ({ ...s, error: err.message }));
+      }
+    };
+    document.addEventListener('visibilitychange', tryPull);
+    window.addEventListener('focus', tryPull);
+    const interval = setInterval(tryPull, SUPABASE_POLL_INTERVAL_MS);
+    return () => {
+      document.removeEventListener('visibilitychange', tryPull);
+      window.removeEventListener('focus', tryPull);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseConfig]);
 
   const actions = useMemo(

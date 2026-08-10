@@ -3,7 +3,8 @@ import { loadState, saveState, newId, mergeWithDefaults } from '../lib/db.js';
 import { computeBehaviorProfile } from '../lib/behaviorProfile.js';
 import { computeStreakCount, nextShieldGrantAt } from '../lib/streak.js';
 import { computeNewlyAchieved } from '../lib/milestones.js';
-import { todayISO } from '../lib/format.js';
+import { requiredLayer2Target, computeRequiredMonthlyExtra } from '../lib/projections.js';
+import { todayISO, money } from '../lib/format.js';
 import { encodeStateToCode, decodeCodeToState } from '../lib/exportImport.js';
 import { loadSupabaseSyncConfig, saveSupabaseSyncConfig, clearSupabaseSyncConfig } from '../lib/supabaseSyncConfig.js';
 import { generatePin, connectOrCreateHousehold, fetchHouseholdState, upsertHouseholdState } from '../lib/supabaseSync.js';
@@ -12,6 +13,33 @@ const DataContext = createContext(null);
 const SUPABASE_SYNC_DEBOUNCE_MS = 1500;
 // No realtime websocket here (see supabaseSync.js) - fast polling instead
 const SUPABASE_POLL_INTERVAL_MS = 4000;
+
+// Re-derives the required monthly debt-payoff target from current balances
+// whenever a debt is edited or a payment posted (called explicitly by those
+// actions, not from recompute() - recompute() runs on every mutation, and
+// the "remaining months to the goal" shrinks a little every single day even
+// with zero balance changes, which would otherwise fire a spurious notice on
+// the first save of each new day).
+function maybeUpdateLayer2Target(s) {
+  const todayIso = todayISO();
+  const required = requiredLayer2Target(s, todayIso);
+  if (required == null) return;
+  const current = s.settings.layer2MonthlyTarget;
+  if (Math.abs(required - current) < 5) return;
+  const req = computeRequiredMonthlyExtra(s, todayIso);
+  const wentUp = required > current;
+  s.settings = { ...s.settings, layer2MonthlyTarget: required, layer2ExtraAllocation: Math.round(req.requiredExtra) };
+  s.pendingNotices = [
+    ...(s.pendingNotices || []),
+    {
+      id: newId(),
+      emoji: wentUp ? '📈' : '📉',
+      title: `היעד החודשי לסילוק חוב ${wentUp ? 'עלה' : 'ירד'} ל-${money(required)}`,
+      body: `בעקבות עדכון ביתרת החוב, הסכום הדרוש כל חודש כדי לעמוד ביעד ${s.settings.targetMonths} החודשים השתנה מ-${money(current)} ל-${money(required)}.`,
+      date: todayIso,
+    },
+  ];
+}
 
 function recompute(next) {
   next.behaviorProfile = computeBehaviorProfile(next);
@@ -206,6 +234,7 @@ export function DataProvider({ children }) {
               debt.closedDate = null;
             }
           }
+          maybeUpdateLayer2Target(s);
         });
       },
       deleteDebtPayment: (id) => {
@@ -221,6 +250,7 @@ export function DataProvider({ children }) {
               if (!debt.closed) debt.closedDate = null;
             }
           }
+          maybeUpdateLayer2Target(s);
         });
       },
 
@@ -235,6 +265,8 @@ export function DataProvider({ children }) {
       updateDebt: (id, patch) => mutate((s) => {
         const idx = s.debts.findIndex((d) => d.id === id);
         if (idx >= 0) s.debts[idx] = { ...s.debts[idx], ...patch };
+        const RECALC_FIELDS = ['currentBalance', 'annualRatePct', 'minMonthlyPayment', 'accelerated'];
+        if (RECALC_FIELDS.some((f) => f in patch)) maybeUpdateLayer2Target(s);
       }),
       deleteDebt: (id) => mutate((s) => { s.debts = s.debts.filter((d) => d.id !== id); }),
 
@@ -275,6 +307,10 @@ export function DataProvider({ children }) {
 
       dismissCelebration: () => mutate((s) => {
         s.pendingCelebrations = (s.pendingCelebrations || []).slice(1);
+      }),
+
+      dismissNotice: (id) => mutate((s) => {
+        s.pendingNotices = (s.pendingNotices || []).filter((n) => n.id !== id);
       }),
     }),
     [mutate],

@@ -148,6 +148,8 @@ export function getDefaultState() {
     streak: { count: 0, lastQualifyingDate: null, shieldAvailable: true, shieldUsedDates: [] },
     achievedMilestones: [],
     pendingCelebrations: [],
+    pendingNotices: [],
+    microWins: [],
   };
 }
 

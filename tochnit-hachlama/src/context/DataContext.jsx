@@ -5,21 +5,10 @@ import { computeStreakCount, nextShieldGrantAt } from '../lib/streak.js';
 import { computeNewlyAchieved } from '../lib/milestones.js';
 import { todayISO } from '../lib/format.js';
 import { encodeStateToCode, decodeCodeToState } from '../lib/exportImport.js';
-import { loadGoogleSyncConfig, saveGoogleSyncConfig, clearGoogleSyncConfig } from '../lib/googleSyncConfig.js';
-import {
-  requestAccessToken,
-  getValidAccessToken,
-  clearCachedToken,
-  findOrCreateSyncFileId,
-  readSyncFile,
-  writeSyncFile,
-} from '../lib/googleSync.js';
 import { loadSupabaseSyncConfig, saveSupabaseSyncConfig, clearSupabaseSyncConfig } from '../lib/supabaseSyncConfig.js';
 import { generatePin, connectOrCreateHousehold, fetchHouseholdState, upsertHouseholdState } from '../lib/supabaseSync.js';
 
 const DataContext = createContext(null);
-const GOOGLE_SYNC_DEBOUNCE_MS = 2500;
-const GOOGLE_AUTO_PULL_INTERVAL_MS = 20000;
 const SUPABASE_SYNC_DEBOUNCE_MS = 1500;
 // No realtime websocket here (see supabaseSync.js) - fast polling instead
 const SUPABASE_POLL_INTERVAL_MS = 4000;
@@ -68,113 +57,7 @@ export function DataProvider({ children }) {
     setState(recompute(mergeWithDefaults(imported)));
   }, []);
 
-  // ---------- automatic sync via the user's Google account ----------
-  const [googleConfig, setGoogleConfig] = useState(() => loadGoogleSyncConfig());
-  const [googleStatus, setGoogleStatus] = useState({ signedIn: !!loadGoogleSyncConfig(), syncing: false, lastSyncAt: null, error: null });
-
-  const googlePullNow = useCallback(async (fileId, { silent = false } = {}) => {
-    setGoogleStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const token = silent ? await getValidAccessToken() : await requestAccessToken();
-      const remote = await readSyncFile(token, fileId);
-      if (remote) setState(recompute(mergeWithDefaults(remote)));
-      setGoogleStatus({ signedIn: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-      return true;
-    } catch (err) {
-      setGoogleStatus((s) => ({ ...s, syncing: false, error: err.message }));
-      return false;
-    }
-  }, []);
-
-  const googlePushNow = useCallback(async () => {
-    if (!googleConfig) return;
-    setGoogleStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const token = await getValidAccessToken();
-      await writeSyncFile(token, googleConfig.fileId, state);
-      setGoogleStatus({ signedIn: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-    } catch (err) {
-      setGoogleStatus((s) => ({ ...s, syncing: false, error: err.message }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleConfig, state]);
-
-  const signInWithGoogle = useCallback(async () => {
-    setGoogleStatus((s) => ({ ...s, syncing: true, error: null }));
-    try {
-      const token = await requestAccessToken();
-      const fileId = await findOrCreateSyncFileId(token);
-      const config = { fileId };
-      saveGoogleSyncConfig(config);
-      setGoogleConfig(config);
-      const remote = await readSyncFile(token, fileId);
-      if (remote) {
-        setState(recompute(mergeWithDefaults(remote)));
-      } else {
-        await writeSyncFile(token, fileId, state);
-      }
-      setGoogleStatus({ signedIn: true, syncing: false, lastSyncAt: new Date().toISOString(), error: null });
-      return true;
-    } catch (err) {
-      setGoogleStatus((s) => ({ ...s, syncing: false, error: err.message }));
-      return false;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
-  const signOutGoogle = useCallback(() => {
-    clearCachedToken();
-    clearGoogleSyncConfig();
-    setGoogleConfig(null);
-    setGoogleStatus({ signedIn: false, syncing: false, lastSyncAt: null, error: null });
-  }, []);
-
-  // silent resume on app load if this device previously signed in
-  const resumedOnMount = useRef(false);
-  useEffect(() => {
-    if (googleConfig && !resumedOnMount.current) {
-      resumedOnMount.current = true;
-      googlePullNow(googleConfig.fileId, { silent: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // debounced auto-push whenever data changes on a signed-in device
-  const googlePushTimer = useRef(null);
-  const googlePushPending = useRef(false);
-  useEffect(() => {
-    if (!googleConfig) return undefined;
-    googlePushPending.current = true;
-    if (googlePushTimer.current) clearTimeout(googlePushTimer.current);
-    googlePushTimer.current = setTimeout(() => {
-      googlePushNow().finally(() => { googlePushPending.current = false; });
-    }, GOOGLE_SYNC_DEBOUNCE_MS);
-    return () => clearTimeout(googlePushTimer.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, googleConfig]);
-
-  // periodic + on-return auto-pull, so changes made on another device show up
-  // here without needing a manual reload - skipped while a local edit is
-  // still waiting to be pushed, so it never clobbers unsaved local changes
-  useEffect(() => {
-    if (!googleConfig) return undefined;
-    const tryPull = () => {
-      if (document.visibilityState !== 'visible') return;
-      if (googlePushPending.current) return;
-      googlePullNow(googleConfig.fileId, { silent: true });
-    };
-    document.addEventListener('visibilitychange', tryPull);
-    window.addEventListener('focus', tryPull);
-    const interval = setInterval(tryPull, GOOGLE_AUTO_PULL_INTERVAL_MS);
-    return () => {
-      document.removeEventListener('visibilitychange', tryPull);
-      window.removeEventListener('focus', tryPull);
-      clearInterval(interval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleConfig]);
-
-  // ---------- automatic sync via a shared Supabase household code ----------
+// ---------- automatic sync via a shared Supabase household code ----------
   const [supabaseConfig, setSupabaseConfig] = useState(() => loadSupabaseSyncConfig());
   const [supabaseStatus, setSupabaseStatus] = useState({
     connected: !!loadSupabaseSyncConfig(),
@@ -400,13 +283,10 @@ export function DataProvider({ children }) {
   const value = useMemo(
     () => ({
       state, ...actions, exportStateCode, importStateCode,
-      googleStatus, signInWithGoogle, signOutGoogle, googlePushNow,
-      googlePullNow: () => googleConfig && googlePullNow(googleConfig.fileId),
       supabaseConfig, supabaseStatus, createHousehold, connectSupabase, disconnectSupabase, supabasePushNow,
     }),
     [
       state, actions, exportStateCode, importStateCode,
-      googleStatus, signInWithGoogle, signOutGoogle, googlePushNow, googlePullNow, googleConfig,
       supabaseConfig, supabaseStatus, createHousehold, connectSupabase, disconnectSupabase, supabasePushNow,
     ],
   );

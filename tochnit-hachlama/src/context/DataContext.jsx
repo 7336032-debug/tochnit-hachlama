@@ -216,6 +216,8 @@ export function DataProvider({ children }) {
   // (see supabaseSync.js) don't allow direct table SELECT, which is what
   // postgres_changes subscriptions require. Skipped while a local edit is
   // still queued to push, so it can't clobber unsaved local changes.
+  // Also runs immediately on 'online' so reconnecting after a dropped
+  // connection doesn't wait out the rest of the poll interval.
   useEffect(() => {
     if (!supabaseConfig) return undefined;
     const tryPull = async () => {
@@ -231,14 +233,31 @@ export function DataProvider({ children }) {
     };
     document.addEventListener('visibilitychange', tryPull);
     window.addEventListener('focus', tryPull);
+    window.addEventListener('online', tryPull);
     const interval = setInterval(tryPull, SUPABASE_POLL_INTERVAL_MS);
     return () => {
       document.removeEventListener('visibilitychange', tryPull);
       window.removeEventListener('focus', tryPull);
+      window.removeEventListener('online', tryPull);
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseConfig]);
+
+  // A push that failed (e.g. a brief network drop) retries on its own -
+  // "fully automatic" means recovering from a hiccup without the user
+  // needing to change anything or press a button, not just pushing on the
+  // next edit. Backs off gently instead of hammering the network.
+  useEffect(() => {
+    if (!supabaseConfig || !supabaseStatus.error) return undefined;
+    const timer = setTimeout(() => { supabasePushNow(); }, 6000);
+    window.addEventListener('online', supabasePushNow);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('online', supabasePushNow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseConfig, supabaseStatus.error]);
 
   const actions = useMemo(
     () => ({

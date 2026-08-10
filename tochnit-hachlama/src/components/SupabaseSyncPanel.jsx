@@ -9,7 +9,7 @@ function formatTime(iso) {
 }
 
 export default function SupabaseSyncPanel() {
-  const { supabaseConfig, supabaseStatus, createHousehold, connectSupabase, disconnectSupabase, supabasePushNow } = useData();
+  const { supabaseConfig, supabaseStatus, createHousehold, connectSupabase, disconnectSupabase } = useData();
   const [joinPin, setJoinPin] = useState('');
   const [copied, setCopied] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
@@ -68,7 +68,7 @@ export default function SupabaseSyncPanel() {
   return (
     <div className="stack">
       <div className="sync-status-row">
-        <span className="pill green">✅ מחוברת</span>
+        <span className="pill green">✅ מחוברת - מסתנכרן אוטומטית</span>
         <span className="muted" style={{ fontSize: 12.5 }}>
           {supabaseStatus.syncing ? 'מסנכרן...' : supabaseStatus.lastSyncAt ? `סונכרן לאחרונה ב-${formatTime(supabaseStatus.lastSyncAt)}` : 'טרם בוצע סנכרון'}
         </span>
@@ -77,16 +77,15 @@ export default function SupabaseSyncPanel() {
         {supabaseConfig.pin}
       </div>
       <p className="sync-hint" style={{ margin: 0 }}>
-        זה קוד המשפחה שלכם - הזיני אותו בדיוק ככה בכל מכשיר נוסף כדי לחבר אותו.
+        זה קוד המשפחה שלכם - הזיני אותו בדיוק ככה בכל מכשיר נוסף כדי לחבר אותו. הסנכרון עצמו קורה לבד ברקע
+        אחרי כל שינוי - אין צורך ללחוץ על שום כפתור.
       </p>
       <button type="button" className="btn btn-secondary btn-block" onClick={copyPin}>
         {copied ? '✓ הועתק' : '📋 העתקת הקוד'}
       </button>
-      {supabaseStatus.error && <p className="sync-error">⚠️ {supabaseStatus.error}</p>}
-
-      <button type="button" className="btn btn-secondary btn-block" onClick={supabasePushNow} disabled={supabaseStatus.syncing}>
-        📤 שמירה עכשיו
-      </button>
+      {supabaseStatus.error && (
+        <p className="sync-error">⚠️ {supabaseStatus.error} - המערכת תנסה לסנכרן שוב לבד ברגע שהחיבור יחזור.</p>
+      )}
 
       {!confirmingDisconnect ? (
         <button type="button" className="btn btn-outline btn-block" onClick={() => setConfirmingDisconnect(true)}>

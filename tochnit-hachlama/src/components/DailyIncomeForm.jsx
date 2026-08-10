@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useData } from '../context/DataContext.jsx';
 import { entryForDate } from '../lib/dailyIncome.js';
+import { pickMicroWinText } from '../lib/microWins.js';
 import { money, todayISO } from '../lib/format.js';
 import './DailyIncomeForm.css';
 
@@ -33,7 +34,8 @@ export default function DailyIncomeForm({ date, onDateChange, onSaved, allowDate
   function submit(e) {
     e.preventDefault();
     upsertDailyIncome({ date, ...values });
-    onSaved?.();
+    const total = FIELDS.reduce((sum, f) => sum + (Number(values[f.key]) || 0), 0);
+    onSaved?.(total > 0 ? pickMicroWinText('income_entry') : undefined);
   }
 
   function clearDay() {

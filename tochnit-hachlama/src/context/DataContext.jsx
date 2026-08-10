@@ -4,7 +4,8 @@ import { computeBehaviorProfile } from '../lib/behaviorProfile.js';
 import { computeStreakCount, nextShieldGrantAt } from '../lib/streak.js';
 import { computeNewlyAchieved } from '../lib/milestones.js';
 import { requiredLayer2Target, computeRequiredMonthlyExtra } from '../lib/projections.js';
-import { todayISO, money } from '../lib/format.js';
+import { logMicroWin, hasMicroWin, debtMilestoneCrossed } from '../lib/microWins.js';
+import { todayISO, addDaysISO, money } from '../lib/format.js';
 import { encodeStateToCode, decodeCodeToState } from '../lib/exportImport.js';
 import { loadSupabaseSyncConfig, saveSupabaseSyncConfig, clearSupabaseSyncConfig } from '../lib/supabaseSyncConfig.js';
 import { generatePin, connectOrCreateHousehold, fetchHouseholdState, upsertHouseholdState } from '../lib/supabaseSync.js';
@@ -41,9 +42,68 @@ function maybeUpdateLayer2Target(s) {
   ];
 }
 
-function recompute(next) {
+// One day without an impulsive purchase is a small win in its own right -
+// checked retroactively for yesterday (the day just closed out) so it only
+// needs a read of existing data, no separate "end of day" job. Idempotent via
+// hasMicroWin, so re-running this on every recompute() is harmless.
+function maybeLogNoImpulsiveDay(next) {
+  const yesterday = addDaysISO(todayISO(), -1);
+  if (hasMicroWin(next, 'no_impulsive_day', yesterday)) return;
+  const yesterdayExpenses = next.expenses.filter((e) => e.categoryType === 'envelope' && e.date === yesterday);
+  if (yesterdayExpenses.length === 0) return;
+  if (!yesterdayExpenses.some((e) => e.isImpulsive === true)) {
+    logMicroWin(next, 'no_impulsive_day', yesterday);
+  }
+}
+
+// Fires exactly once, the moment today's very first entry of any kind lands,
+// if the previous activity was 3+ days ago - a warm welcome back instead of
+// silence or a guilt-inducing streak reset.
+function maybeLogReturnAfterBreak(next) {
+  const today = todayISO();
+  if (hasMicroWin(next, 'return_after_break', today)) return;
+  const allDates = [
+    ...next.expenses.map((e) => e.date),
+    ...next.incomeEntries.map((e) => e.date),
+    ...next.dailyIncome.map((e) => e.date),
+    ...next.debtPayments.map((e) => e.date),
+    ...next.savingsEntries.map((e) => e.date),
+  ];
+  if (allDates.filter((d) => d === today).length !== 1) return;
+  const priorDates = allDates.filter((d) => d < today);
+  if (priorDates.length === 0) return;
+  const lastPrior = priorDates.reduce((max, d) => (d > max ? d : max));
+  const gapDays = Math.round((new Date(today) - new Date(lastPrior)) / 86400000);
+  if (gapDays >= 3) {
+    logMicroWin(next, 'return_after_break', today);
+    next.pendingNotices = [
+      ...(next.pendingNotices || []),
+      {
+        id: newId(),
+        emoji: '🤗',
+        title: 'ברוכה השבה!',
+        body: `לא היה תיעוד כבר ${gapDays} ימים - וזה בסדר גמור. החזרה היום היא כבר צעד, לא כישלון. יאללה, ממשיכות מכאן.`,
+        date: today,
+      },
+    ];
+  }
+}
+
+function recompute(next, prevStreakCount = null) {
   next.behaviorProfile = computeBehaviorProfile(next);
   const count = computeStreakCount(next, todayISO());
+  if (prevStreakCount != null && prevStreakCount >= 2 && count < prevStreakCount) {
+    next.pendingNotices = [
+      ...(next.pendingNotices || []),
+      {
+        id: newId(),
+        emoji: '🤍',
+        title: 'הרצף התאפס - וזה בסדר גמור',
+        body: `יום קשה קורה לכולן. הרצף החדש מתחיל היום, ואת כבר הוכחת שאת יודעת לבנות רצף - הפעם הקודמת החזיקה ${prevStreakCount} ימים.`,
+        date: todayISO(),
+      },
+    ];
+  }
   const grantedShield = nextShieldGrantAt(count) && count !== next.streak.count ? true : next.streak.shieldAvailable;
   next.streak = { ...next.streak, count, shieldAvailable: grantedShield };
   const fresh = computeNewlyAchieved(next);
@@ -51,6 +111,8 @@ function recompute(next) {
     next.achievedMilestones = [...next.achievedMilestones, ...fresh];
     next.pendingCelebrations = [...(next.pendingCelebrations || []), ...fresh];
   }
+  maybeLogNoImpulsiveDay(next);
+  maybeLogReturnAfterBreak(next);
   return next;
 }
 
@@ -72,7 +134,7 @@ export function DataProvider({ children }) {
     setState((prev) => {
       const draft = structuredClone(prev);
       const result = fn(draft) || draft;
-      return recompute(result);
+      return recompute(result, prev.streak.count);
     });
   }, []);
 
@@ -183,6 +245,7 @@ export function DataProvider({ children }) {
       addIncome: ({ date, source, amount, note }) => {
         mutate((s) => {
           s.incomeEntries.push({ id: newId(), date, source, amount: Number(amount), note: note || '' });
+          if (Number(amount) > 0) logMicroWin(s, 'income_entry', date);
         });
       },
       deleteIncome: (id) => mutate((s) => { s.incomeEntries = s.incomeEntries.filter((e) => e.id !== id); }),
@@ -198,6 +261,8 @@ export function DataProvider({ children }) {
           const idx = s.dailyIncome.findIndex((e) => e.date === date);
           if (idx >= 0) s.dailyIncome[idx] = { ...s.dailyIncome[idx], ...values };
           else s.dailyIncome.push({ id: newId(), date, ...values });
+          const total = values.cash + values.bit + values.credit + values.transfer;
+          if (total > 0) logMicroWin(s, 'income_entry', date);
         });
       },
       deleteDailyIncome: (date) => mutate((s) => { s.dailyIncome = s.dailyIncome.filter((e) => e.date !== date); }),
@@ -209,6 +274,7 @@ export function DataProvider({ children }) {
             amount: Number(amount), note: note || '',
             isImpulsive: isImpulsive ?? null, isShared: !!isShared,
           });
+          logMicroWin(s, isImpulsive === true ? 'expense_entry_impulsive' : 'expense_entry', date);
         });
       },
       updateExpense: (id, patch) => {
@@ -221,6 +287,7 @@ export function DataProvider({ children }) {
 
       addDebtPayment: ({ date, debtId, amount }) => {
         mutate((s) => {
+          const totalPaidBefore = s.debts.reduce((sum, d) => sum + (d.openingBalance - d.currentBalance), 0);
           s.debtPayments.push({ id: newId(), date, debtId, amount: Number(amount) });
           const debt = s.debts.find((d) => d.id === debtId);
           if (debt) {
@@ -234,6 +301,8 @@ export function DataProvider({ children }) {
               debt.closedDate = null;
             }
           }
+          const totalPaidAfter = s.debts.reduce((sum, d) => sum + (d.openingBalance - d.currentBalance), 0);
+          logMicroWin(s, debtMilestoneCrossed(totalPaidBefore, totalPaidAfter) != null ? 'debt_milestone_1000' : 'debt_payment', date);
           maybeUpdateLayer2Target(s);
         });
       },
@@ -257,6 +326,7 @@ export function DataProvider({ children }) {
       addSavingsEntry: ({ date, amount, note }) => {
         mutate((s) => {
           s.savingsEntries.push({ id: newId(), date, amount: Number(amount), note: note || '' });
+          logMicroWin(s, 'savings_entry', date);
         });
       },
       deleteSavingsEntry: (id) => mutate((s) => { s.savingsEntries = s.savingsEntries.filter((e) => e.id !== id); }),

@@ -1,7 +1,8 @@
 import { useData } from '../context/DataContext.jsx';
 import { allMilestoneDefs } from '../lib/milestones.js';
 import { overallPercentPaid, totalCurrentDebt, totalOriginalDebt, projectedFreedomDateISO } from '../lib/projections.js';
-import { money, humanDate, todayISO, clamp } from '../lib/format.js';
+import { monthMicroWinsCount } from '../lib/microWins.js';
+import { money, humanDate, todayISO, monthKey, clamp } from '../lib/format.js';
 import './Milestones.css';
 
 export default function Milestones() {
@@ -15,6 +16,7 @@ export default function Milestones() {
 
   const pctPaid = overallPercentPaid(state);
   const freedomDate = projectedFreedomDateISO(state);
+  const microWinsThisMonth = monthMicroWinsCount(state, monthKey(todayISO()));
 
   return (
     <div className="stack">
@@ -30,6 +32,15 @@ export default function Milestones() {
           <span className="muted">{money(totalOriginalDebt(state))} סה"כ</span>
         </div>
         {freedomDate && <div className="freedom-date" style={{ textAlign: 'center', marginTop: 14 }}>🏁 יעד חופש: {humanDate(freedomDate)}</div>}
+      </div>
+
+      <div className="section-title">✨ ניצחונות קטנים</div>
+      <div className="card row-between">
+        <div>
+          <div style={{ fontSize: 28, fontWeight: 900 }}>{microWinsThisMonth}</div>
+          <div className="muted" style={{ fontSize: 13 }}>ניצחונות קטנים החודש - כל תיעוד, כל תשלום, כל יום שהמשכת</div>
+        </div>
+        <span style={{ fontSize: 32 }}>✨</span>
       </div>
 
       <div className="section-title">🔥 רצף נוכחי</div>

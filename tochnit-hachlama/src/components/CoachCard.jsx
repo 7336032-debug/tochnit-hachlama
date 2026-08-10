@@ -11,6 +11,7 @@ const TECHNIQUE_EMOJI = {
   streak: '🔥',
   values: '💛',
   pattern: '🔎',
+  reframe_past: '🌱',
 };
 
 export default function CoachCard() {

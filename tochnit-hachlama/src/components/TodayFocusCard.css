@@ -1,0 +1,25 @@
+.today-focus-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--blue-bg);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.today-focus-emoji {
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.today-focus-label {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--blue);
+  margin-bottom: 3px;
+}
+
+.today-focus-text {
+  font-size: 14px;
+  line-height: 1.5;
+}

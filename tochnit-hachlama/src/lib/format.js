@@ -30,6 +30,12 @@ export function addMonthsISO(dateStr, n) {
   return d.toISOString().slice(0, 10);
 }
 
+export function addDaysISO(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 export function monthsBetween(fromISO, toISO) {
   const a = new Date(fromISO + 'T00:00:00');
   const b = new Date(toISO + 'T00:00:00');

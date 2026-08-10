@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1f9d68"/>
+      <stop offset="55%" stop-color="#2f8f8a"/>
+      <stop offset="100%" stop-color="#3a66d1"/>
+    </linearGradient>
+    <linearGradient id="route" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#f5e08c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background, no margins: iOS applies its own corner mask -->
+  <rect x="0" y="0" width="200" height="200" fill="url(#bg)"/>
+
+  <!-- compass ring motif, echoing the app's main icon (🧭) -->
+  <circle cx="100" cy="100" r="72" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="3"/>
+  <g stroke="#ffffff" stroke-opacity="0.28" stroke-width="3" stroke-linecap="round">
+    <line x1="100" y1="24" x2="100" y2="34"/>
+    <line x1="100" y1="166" x2="100" y2="176"/>
+    <line x1="24" y1="100" x2="34" y2="100"/>
+    <line x1="166" y1="100" x2="176" y2="100"/>
+  </g>
+
+  <!-- ascending route toward payoff: small dots climbing to the corner -->
+  <g fill="url(#route)">
+    <circle cx="34" cy="158" r="5"/>
+    <circle cx="54" cy="142" r="5.5"/>
+    <circle cx="76" cy="124" r="6.5"/>
+  </g>
+  <path d="M34 158 L54 142 L76 124" stroke="url(#route)" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-opacity="0.85"/>
+
+  <!-- letter ק -->
+  <text x="118" y="146" text-anchor="middle"
+        font-family="Heebo, Arial, 'Helvetica Neue', Helvetica, sans-serif"
+        font-weight="900" font-size="118" fill="#ffffff">ק</text>
+</svg>

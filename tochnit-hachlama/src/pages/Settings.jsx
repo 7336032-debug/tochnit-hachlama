@@ -4,7 +4,6 @@ import { exportAllToCsv } from '../lib/csvExport.js';
 import { effectiveRemainingInstallments, fixedCostsTotalByType, activeEnvelopes } from '../lib/projections.js';
 import { money, todayISO } from '../lib/format.js';
 import SyncSection from '../components/SyncSection.jsx';
-import GoogleSyncPanel from '../components/GoogleSyncPanel.jsx';
 import SupabaseSyncPanel from '../components/SupabaseSyncPanel.jsx';
 import './Settings.css';
 
@@ -42,13 +41,11 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="סנכרון מיידי (חדש - בבדיקה)" emoji="⚡" defaultOpen>
+      <Section title="סנכרון בין מכשירים" emoji="⚡" defaultOpen>
         <SupabaseSyncPanel />
       </Section>
 
-      <Section title="סנכרון בין מכשירים" emoji="☁️">
-        <GoogleSyncPanel />
-        <div className="settings-divider" />
+      <Section title="גיבוי/העברה ידניים" emoji="📤">
         <SyncSection />
       </Section>
 

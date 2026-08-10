@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import NavBar from './components/NavBar.jsx';
 import TopBar from './components/TopBar.jsx';
 import Celebration from './components/Celebration.jsx';
+import NoticeBanner from './components/NoticeBanner.jsx';
 import Onboarding from './components/Onboarding.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Debts from './pages/Debts.jsx';
@@ -23,6 +24,7 @@ export default function App() {
     <>
       <TopBar />
       <div className="app-shell">
+        <NoticeBanner />
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/debts" element={<Debts />} />

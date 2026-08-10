@@ -15,7 +15,9 @@ import {
   suggestedActionsForGap,
   activeEnvelopes,
 } from '../lib/projections.js';
+import { monthMicroWinsCount } from '../lib/microWins.js';
 import { money, monthKey, todayISO, humanDate, humanMonthYear, clamp } from '../lib/format.js';
+import TodayFocusCard from '../components/TodayFocusCard.jsx';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -33,10 +35,13 @@ export default function Dashboard() {
   const paceColorVar = paceRatio >= 1 ? 'var(--green)' : paceRatio >= 0.6 ? 'var(--amber)' : 'var(--red)';
   const isShortfall = status.hasIncome && status.gap > 0 && status.paidToDebtThisMonth < status.target;
   const remainingForVariable = status.surplus - status.target;
+  const microWinsThisMonth = monthMicroWinsCount(state, mKey);
 
   return (
     <div className="stack">
       <DashboardSnapshot />
+
+      <TodayFocusCard />
 
       <CoachCard />
 
@@ -65,7 +70,12 @@ export default function Dashboard() {
       <div className="card">
         <div className="row-between" style={{ marginBottom: 8 }}>
           <strong>⚡ מד קצב סילוק החוב</strong>
-          <span className={`pill ${paceColor}`}>{Math.round(paceRatio * 100)}%</span>
+          <div className="row" style={{ gap: 6 }}>
+            {microWinsThisMonth > 0 && (
+              <span className="pill blue" title="ניצחונות קטנים החודש">✨ {microWinsThisMonth}</span>
+            )}
+            <span className={`pill ${paceColor}`}>{Math.round(paceRatio * 100)}%</span>
+          </div>
         </div>
         <div className="progress-track">
           <div className="progress-fill" style={{ width: `${clamp(paceRatio * 100, 0, 100)}%`, background: paceColorVar }} />

@@ -6,6 +6,7 @@ import Toast from '../components/Toast.jsx';
 import DailyIncomeForm from '../components/DailyIncomeForm.jsx';
 import { money, todayISO, humanDateShort } from '../lib/format.js';
 import { expenseCountedAmount, totalSavingsBalance, activeEnvelopes } from '../lib/projections.js';
+import { pickMicroWinText, debtMilestoneCrossed, debtMilestoneToastText } from '../lib/microWins.js';
 import './Entry.css';
 
 const QUICK_AMOUNTS = [20, 50, 100, 200, 350, 500];
@@ -17,13 +18,13 @@ const INCOME_SOURCES = [
 ];
 
 function useSuccessToast() {
-  const [show, setShow] = useState(false);
-  function trigger() {
+  const [toast, setToast] = useState({ show: false, text: '' });
+  function trigger(text) {
     if (navigator.vibrate) navigator.vibrate(40);
-    setShow(true);
-    setTimeout(() => setShow(false), 1100);
+    setToast({ show: true, text: text || '✓ נשמר בהצלחה' });
+    setTimeout(() => setToast((t) => ({ ...t, show: false })), 2000);
   }
-  return [show, trigger];
+  return [toast, trigger];
 }
 
 function ExpenseForm({ onSaved }) {
@@ -55,7 +56,7 @@ function ExpenseForm({ onSaved }) {
     setNote('');
     setIsImpulsive(null);
     setIsShared(false);
-    onSaved();
+    onSaved(pickMicroWinText(isImpulsive === true ? 'expense_entry_impulsive' : 'expense_entry'));
   }
 
   return (
@@ -151,7 +152,7 @@ function IncomeForm({ onSaved }) {
     addIncome({ date, source, amount: amt, note });
     setAmount('');
     setNote('');
-    onSaved();
+    onSaved(pickMicroWinText('income_entry'));
   }
 
   return (
@@ -211,9 +212,11 @@ function DebtPaymentForm({ onSaved }) {
     e.preventDefault();
     const amt = Number(amount);
     if (!amt || amt <= 0 || !debtId) return;
+    const totalPaidBefore = state.debts.reduce((sum, d) => sum + (d.openingBalance - d.currentBalance), 0);
     addDebtPayment({ date, debtId, amount: amt });
     setAmount('');
-    onSaved();
+    const crossed = debtMilestoneCrossed(totalPaidBefore, totalPaidBefore + amt);
+    onSaved(crossed != null ? debtMilestoneToastText(crossed) : pickMicroWinText('debt_payment'));
   }
 
   if (openDebts.length === 0) {
@@ -281,7 +284,7 @@ function SavingsForm({ onSaved }) {
     addSavingsEntry({ date, amount: amt, note });
     setAmount('');
     setNote('');
-    onSaved();
+    onSaved(pickMicroWinText('savings_entry'));
   }
 
   return (
@@ -362,7 +365,7 @@ function RecentExpenses() {
 
 export default function Entry() {
   const [tab, setTab] = useState('expense');
-  const [show, trigger] = useSuccessToast();
+  const [toast, trigger] = useSuccessToast();
 
   return (
     <div className="stack">
@@ -381,7 +384,7 @@ export default function Entry() {
       </div>
 
       <RecentExpenses />
-      <Toast show={show} text="✓ נשמר בהצלחה" />
+      <Toast show={toast.show} text={toast.text} />
     </div>
   );
 }

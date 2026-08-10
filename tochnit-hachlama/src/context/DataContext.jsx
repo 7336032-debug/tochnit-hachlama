@@ -3,7 +3,9 @@ import { loadState, saveState, newId, mergeWithDefaults } from '../lib/db.js';
 import { computeBehaviorProfile } from '../lib/behaviorProfile.js';
 import { computeStreakCount, nextShieldGrantAt } from '../lib/streak.js';
 import { computeNewlyAchieved } from '../lib/milestones.js';
-import { todayISO } from '../lib/format.js';
+import { requiredLayer2Target, computeRequiredMonthlyExtra } from '../lib/projections.js';
+import { logMicroWin, hasMicroWin, debtMilestoneCrossed } from '../lib/microWins.js';
+import { todayISO, addDaysISO, money } from '../lib/format.js';
 import { encodeStateToCode, decodeCodeToState } from '../lib/exportImport.js';
 import { loadSupabaseSyncConfig, saveSupabaseSyncConfig, clearSupabaseSyncConfig } from '../lib/supabaseSyncConfig.js';
 import { generatePin, connectOrCreateHousehold, fetchHouseholdState, upsertHouseholdState } from '../lib/supabaseSync.js';
@@ -13,9 +15,95 @@ const SUPABASE_SYNC_DEBOUNCE_MS = 1500;
 // No realtime websocket here (see supabaseSync.js) - fast polling instead
 const SUPABASE_POLL_INTERVAL_MS = 4000;
 
-function recompute(next) {
+// Re-derives the required monthly debt-payoff target from current balances
+// whenever a debt is edited or a payment posted (called explicitly by those
+// actions, not from recompute() - recompute() runs on every mutation, and
+// the "remaining months to the goal" shrinks a little every single day even
+// with zero balance changes, which would otherwise fire a spurious notice on
+// the first save of each new day).
+function maybeUpdateLayer2Target(s) {
+  const todayIso = todayISO();
+  const required = requiredLayer2Target(s, todayIso);
+  if (required == null) return;
+  const current = s.settings.layer2MonthlyTarget;
+  if (Math.abs(required - current) < 5) return;
+  const req = computeRequiredMonthlyExtra(s, todayIso);
+  const wentUp = required > current;
+  s.settings = { ...s.settings, layer2MonthlyTarget: required, layer2ExtraAllocation: Math.round(req.requiredExtra) };
+  s.pendingNotices = [
+    ...(s.pendingNotices || []),
+    {
+      id: newId(),
+      emoji: wentUp ? '📈' : '📉',
+      title: `היעד החודשי לסילוק חוב ${wentUp ? 'עלה' : 'ירד'} ל-${money(required)}`,
+      body: `בעקבות עדכון ביתרת החוב, הסכום הדרוש כל חודש כדי לעמוד ביעד ${s.settings.targetMonths} החודשים השתנה מ-${money(current)} ל-${money(required)}.`,
+      date: todayIso,
+    },
+  ];
+}
+
+// One day without an impulsive purchase is a small win in its own right -
+// checked retroactively for yesterday (the day just closed out) so it only
+// needs a read of existing data, no separate "end of day" job. Idempotent via
+// hasMicroWin, so re-running this on every recompute() is harmless.
+function maybeLogNoImpulsiveDay(next) {
+  const yesterday = addDaysISO(todayISO(), -1);
+  if (hasMicroWin(next, 'no_impulsive_day', yesterday)) return;
+  const yesterdayExpenses = next.expenses.filter((e) => e.categoryType === 'envelope' && e.date === yesterday);
+  if (yesterdayExpenses.length === 0) return;
+  if (!yesterdayExpenses.some((e) => e.isImpulsive === true)) {
+    logMicroWin(next, 'no_impulsive_day', yesterday);
+  }
+}
+
+// Fires exactly once, the moment today's very first entry of any kind lands,
+// if the previous activity was 3+ days ago - a warm welcome back instead of
+// silence or a guilt-inducing streak reset.
+function maybeLogReturnAfterBreak(next) {
+  const today = todayISO();
+  if (hasMicroWin(next, 'return_after_break', today)) return;
+  const allDates = [
+    ...next.expenses.map((e) => e.date),
+    ...next.incomeEntries.map((e) => e.date),
+    ...next.dailyIncome.map((e) => e.date),
+    ...next.debtPayments.map((e) => e.date),
+    ...next.savingsEntries.map((e) => e.date),
+  ];
+  if (allDates.filter((d) => d === today).length !== 1) return;
+  const priorDates = allDates.filter((d) => d < today);
+  if (priorDates.length === 0) return;
+  const lastPrior = priorDates.reduce((max, d) => (d > max ? d : max));
+  const gapDays = Math.round((new Date(today) - new Date(lastPrior)) / 86400000);
+  if (gapDays >= 3) {
+    logMicroWin(next, 'return_after_break', today);
+    next.pendingNotices = [
+      ...(next.pendingNotices || []),
+      {
+        id: newId(),
+        emoji: '🤗',
+        title: 'ברוכה השבה!',
+        body: `לא היה תיעוד כבר ${gapDays} ימים - וזה בסדר גמור. החזרה היום היא כבר צעד, לא כישלון. יאללה, ממשיכות מכאן.`,
+        date: today,
+      },
+    ];
+  }
+}
+
+function recompute(next, prevStreakCount = null) {
   next.behaviorProfile = computeBehaviorProfile(next);
   const count = computeStreakCount(next, todayISO());
+  if (prevStreakCount != null && prevStreakCount >= 2 && count < prevStreakCount) {
+    next.pendingNotices = [
+      ...(next.pendingNotices || []),
+      {
+        id: newId(),
+        emoji: '🤍',
+        title: 'הרצף התאפס - וזה בסדר גמור',
+        body: `יום קשה קורה לכולן. הרצף החדש מתחיל היום, ואת כבר הוכחת שאת יודעת לבנות רצף - הפעם הקודמת החזיקה ${prevStreakCount} ימים.`,
+        date: todayISO(),
+      },
+    ];
+  }
   const grantedShield = nextShieldGrantAt(count) && count !== next.streak.count ? true : next.streak.shieldAvailable;
   next.streak = { ...next.streak, count, shieldAvailable: grantedShield };
   const fresh = computeNewlyAchieved(next);
@@ -23,6 +111,8 @@ function recompute(next) {
     next.achievedMilestones = [...next.achievedMilestones, ...fresh];
     next.pendingCelebrations = [...(next.pendingCelebrations || []), ...fresh];
   }
+  maybeLogNoImpulsiveDay(next);
+  maybeLogReturnAfterBreak(next);
   return next;
 }
 
@@ -44,7 +134,7 @@ export function DataProvider({ children }) {
     setState((prev) => {
       const draft = structuredClone(prev);
       const result = fn(draft) || draft;
-      return recompute(result);
+      return recompute(result, prev.streak.count);
     });
   }, []);
 
@@ -126,6 +216,8 @@ export function DataProvider({ children }) {
   // (see supabaseSync.js) don't allow direct table SELECT, which is what
   // postgres_changes subscriptions require. Skipped while a local edit is
   // still queued to push, so it can't clobber unsaved local changes.
+  // Also runs immediately on 'online' so reconnecting after a dropped
+  // connection doesn't wait out the rest of the poll interval.
   useEffect(() => {
     if (!supabaseConfig) return undefined;
     const tryPull = async () => {
@@ -141,20 +233,38 @@ export function DataProvider({ children }) {
     };
     document.addEventListener('visibilitychange', tryPull);
     window.addEventListener('focus', tryPull);
+    window.addEventListener('online', tryPull);
     const interval = setInterval(tryPull, SUPABASE_POLL_INTERVAL_MS);
     return () => {
       document.removeEventListener('visibilitychange', tryPull);
       window.removeEventListener('focus', tryPull);
+      window.removeEventListener('online', tryPull);
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseConfig]);
+
+  // A push that failed (e.g. a brief network drop) retries on its own -
+  // "fully automatic" means recovering from a hiccup without the user
+  // needing to change anything or press a button, not just pushing on the
+  // next edit. Backs off gently instead of hammering the network.
+  useEffect(() => {
+    if (!supabaseConfig || !supabaseStatus.error) return undefined;
+    const timer = setTimeout(() => { supabasePushNow(); }, 6000);
+    window.addEventListener('online', supabasePushNow);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('online', supabasePushNow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseConfig, supabaseStatus.error]);
 
   const actions = useMemo(
     () => ({
       addIncome: ({ date, source, amount, note }) => {
         mutate((s) => {
           s.incomeEntries.push({ id: newId(), date, source, amount: Number(amount), note: note || '' });
+          if (Number(amount) > 0) logMicroWin(s, 'income_entry', date);
         });
       },
       deleteIncome: (id) => mutate((s) => { s.incomeEntries = s.incomeEntries.filter((e) => e.id !== id); }),
@@ -170,6 +280,8 @@ export function DataProvider({ children }) {
           const idx = s.dailyIncome.findIndex((e) => e.date === date);
           if (idx >= 0) s.dailyIncome[idx] = { ...s.dailyIncome[idx], ...values };
           else s.dailyIncome.push({ id: newId(), date, ...values });
+          const total = values.cash + values.bit + values.credit + values.transfer;
+          if (total > 0) logMicroWin(s, 'income_entry', date);
         });
       },
       deleteDailyIncome: (date) => mutate((s) => { s.dailyIncome = s.dailyIncome.filter((e) => e.date !== date); }),
@@ -181,6 +293,7 @@ export function DataProvider({ children }) {
             amount: Number(amount), note: note || '',
             isImpulsive: isImpulsive ?? null, isShared: !!isShared,
           });
+          logMicroWin(s, isImpulsive === true ? 'expense_entry_impulsive' : 'expense_entry', date);
         });
       },
       updateExpense: (id, patch) => {
@@ -193,6 +306,7 @@ export function DataProvider({ children }) {
 
       addDebtPayment: ({ date, debtId, amount }) => {
         mutate((s) => {
+          const totalPaidBefore = s.debts.reduce((sum, d) => sum + (d.openingBalance - d.currentBalance), 0);
           s.debtPayments.push({ id: newId(), date, debtId, amount: Number(amount) });
           const debt = s.debts.find((d) => d.id === debtId);
           if (debt) {
@@ -206,6 +320,9 @@ export function DataProvider({ children }) {
               debt.closedDate = null;
             }
           }
+          const totalPaidAfter = s.debts.reduce((sum, d) => sum + (d.openingBalance - d.currentBalance), 0);
+          logMicroWin(s, debtMilestoneCrossed(totalPaidBefore, totalPaidAfter) != null ? 'debt_milestone_1000' : 'debt_payment', date);
+          maybeUpdateLayer2Target(s);
         });
       },
       deleteDebtPayment: (id) => {
@@ -221,12 +338,14 @@ export function DataProvider({ children }) {
               if (!debt.closed) debt.closedDate = null;
             }
           }
+          maybeUpdateLayer2Target(s);
         });
       },
 
       addSavingsEntry: ({ date, amount, note }) => {
         mutate((s) => {
           s.savingsEntries.push({ id: newId(), date, amount: Number(amount), note: note || '' });
+          logMicroWin(s, 'savings_entry', date);
         });
       },
       deleteSavingsEntry: (id) => mutate((s) => { s.savingsEntries = s.savingsEntries.filter((e) => e.id !== id); }),
@@ -235,6 +354,8 @@ export function DataProvider({ children }) {
       updateDebt: (id, patch) => mutate((s) => {
         const idx = s.debts.findIndex((d) => d.id === id);
         if (idx >= 0) s.debts[idx] = { ...s.debts[idx], ...patch };
+        const RECALC_FIELDS = ['currentBalance', 'annualRatePct', 'minMonthlyPayment', 'accelerated'];
+        if (RECALC_FIELDS.some((f) => f in patch)) maybeUpdateLayer2Target(s);
       }),
       deleteDebt: (id) => mutate((s) => { s.debts = s.debts.filter((d) => d.id !== id); }),
 
@@ -275,6 +396,10 @@ export function DataProvider({ children }) {
 
       dismissCelebration: () => mutate((s) => {
         s.pendingCelebrations = (s.pendingCelebrations || []).slice(1);
+      }),
+
+      dismissNotice: (id) => mutate((s) => {
+        s.pendingNotices = (s.pendingNotices || []).filter((n) => n.id !== id);
       }),
     }),
     [mutate],

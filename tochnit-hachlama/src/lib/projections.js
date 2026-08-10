@@ -44,6 +44,15 @@ export function expenseCountedAmount(e) {
   return e.isShared ? e.amount / 2 : e.amount;
 }
 
+export function expenseCategoryLabel(state, expense) {
+  const list = expense.categoryType === 'fixed' ? state.fixedCosts : state.envelopes;
+  return list.find((c) => c.id === expense.categoryId) || { emoji: '❔', name: 'לא ידוע' };
+}
+
+export function expensesForDate(state, dateISO) {
+  return state.expenses.filter((e) => e.date === dateISO);
+}
+
 export function monthExpensesByEnvelope(state, mKey) {
   const map = {};
   for (const e of state.expenses) {
@@ -154,7 +163,7 @@ export function estimateSlippageMonths(state, recurringMonthlyGap) {
 
 // Simulates monthly minimum + extra payments across debts by priority.
 // debts: [{id, balance, annualRatePct, minPayment, priority, accelerated, closed}]
-function simulateWaterfall(debts, extraPool) {
+export function simulateWaterfall(debts, extraPool) {
   const working = debts.map((d) => ({ ...d }));
   const schedule = [];
   const closedAtMonth = {};
@@ -299,6 +308,66 @@ export function overallPercentPaid(state) {
   const current = totalCurrentDebt(state);
   if (original <= 0) return 0;
   return Math.max(0, Math.min(100, ((original - current) / original) * 100));
+}
+
+// ---------- required monthly amount to hit the target payoff date ----------
+
+// Sum of minimum payments still owed on open debts (accelerated or not) -
+// this is the "floor" of layer2MonthlyTarget; the rest is the extra
+// acceleration payment on top.
+export function openDebtsMinTotal(state) {
+  return state.debts.filter((d) => !d.closed).reduce((sum, d) => sum + d.minMonthlyPayment, 0);
+}
+
+// Back-solves (via bisection) the smallest extra monthly payment that closes
+// every *accelerated* debt (spouse + bank by default - the ones the 24-month
+// goal is actually about) by targetDateISO, using today's real balances/rates.
+// Not part of the general recompute() pipeline - callers trigger it
+// explicitly after a balance/rate/min-payment edit or a debt payment, so the
+// required amount only ever changes in response to an actual data change,
+// not silently drifting day to day as the target date approaches.
+export function computeRequiredMonthlyExtra(state, todayIso = todayISO()) {
+  const targetDateISO = addMonthsISO(state.settings.planStartDate, state.settings.targetMonths);
+  const remainingMonths = monthsBetween(todayIso, targetDateISO);
+  const accelerated = state.debts.filter((d) => d.accelerated && !d.closed && d.currentBalance > 0);
+
+  if (accelerated.length === 0) {
+    return { requiredExtra: 0, remainingMonths, feasible: true };
+  }
+  if (remainingMonths < 1) {
+    return { requiredExtra: null, remainingMonths, feasible: false };
+  }
+
+  const asWorkingDebts = () => accelerated.map((d) => ({
+    id: d.id, balance: d.currentBalance, annualRatePct: d.annualRatePct,
+    minPayment: d.minMonthlyPayment, priority: d.priority, accelerated: true,
+  }));
+
+  const finishesWithin = (extra) => {
+    const { finishMonth } = simulateWaterfall(asWorkingDebts(), extra);
+    return finishMonth != null && finishMonth <= remainingMonths;
+  };
+
+  let hi = accelerated.reduce((s, d) => s + d.currentBalance, 0);
+  if (!finishesWithin(hi)) {
+    // even paying it all off at once can't beat the calendar - not feasible
+    return { requiredExtra: null, remainingMonths, feasible: false };
+  }
+  let lo = 0;
+  for (let i = 0; i < 40; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (finishesWithin(mid)) hi = mid; else lo = mid;
+  }
+  return { requiredExtra: Math.ceil(hi / 10) * 10, remainingMonths, feasible: true };
+}
+
+// The full layer2MonthlyTarget implied by computeRequiredMonthlyExtra - the
+// acceleration extra plus everyone's minimum payments (mirrors how the
+// original 9,608 default was put together: 6,408 extra + 2,600 + 600 mins).
+export function requiredLayer2Target(state, todayIso = todayISO()) {
+  const req = computeRequiredMonthlyExtra(state, todayIso);
+  if (!req.feasible || req.requiredExtra == null) return null;
+  return Math.round(req.requiredExtra + openDebtsMinTotal(state));
 }
 
 export function healthScore(state, mKey = monthKey(todayISO())) {

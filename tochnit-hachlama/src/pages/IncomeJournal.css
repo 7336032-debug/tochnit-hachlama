@@ -7,6 +7,14 @@
 
 .journal-title { font-weight: 800; font-size: 16px; }
 
+.journal-title-btn {
+  font-weight: 800;
+  font-size: 15px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+.journal-title-btn:active { background: var(--surface-alt); }
+
 .journal-summary {
   display: flex;
   justify-content: space-between;
@@ -33,6 +41,7 @@
 }
 
 .journal-cell {
+  position: relative;
   aspect-ratio: 1;
   min-height: 44px;
   border-radius: 10px;
@@ -43,6 +52,14 @@
   gap: 2px;
   background: var(--surface-alt);
   font-size: 11px;
+}
+
+.journal-cell-holiday-dot {
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 4px;
+  font-size: 9px;
+  color: var(--gold);
 }
 
 .journal-cell-blank { background: transparent; }
@@ -104,6 +121,8 @@
 .journal-modal {
   width: 100%;
   max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: 18px 16px calc(24px + var(--safe-b));
   animation: slideUp 0.25s ease;
@@ -112,4 +131,57 @@
 @keyframes slideUp {
   from { transform: translateY(30px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* ---- day detail (used both standalone and inside the modal) ---- */
+.day-detail-dates { margin-bottom: 4px; }
+.day-detail-civil { font-weight: 800; font-size: 15px; }
+.day-detail-hebrew { font-size: 13px; margin-top: 2px; }
+
+.day-holiday-banner {
+  background: var(--amber-bg);
+  color: var(--amber);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- week view ---- */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.week-cell {
+  position: relative;
+  min-height: 76px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: var(--surface-alt);
+  padding: 6px 2px;
+}
+
+.week-cell-future { opacity: 0.35; }
+.week-cell-noWork { border: 1px dashed var(--border); }
+.week-cell-worked { background: var(--green-bg); color: var(--green-strong); }
+.week-cell-today { box-shadow: 0 0 0 2px var(--blue) inset; }
+
+.week-cell-dayname { font-size: 10px; font-weight: 700; color: var(--text-muted); }
+.week-cell-daynum { font-size: 15px; font-weight: 800; }
+.week-cell-total { font-size: 10px; font-weight: 700; }
+
+.week-cell-holiday-dot {
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 3px;
+  font-size: 8px;
 }

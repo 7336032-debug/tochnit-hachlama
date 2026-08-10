@@ -13,6 +13,7 @@ export const NUDGE_TECHNIQUES = [
   { id: 'streak', label: 'רצף והישגים' },
   { id: 'values', label: 'תזכורת ערכים' },
   { id: 'pattern', label: 'דרבון ממוקד-דפוס' },
+  { id: 'reframe_past', label: 'העבר לא קובע את העתיד' },
 ];
 
 function defaultFixedCosts() {
@@ -148,6 +149,8 @@ export function getDefaultState() {
     streak: { count: 0, lastQualifyingDate: null, shieldAvailable: true, shieldUsedDates: [] },
     achievedMilestones: [],
     pendingCelebrations: [],
+    pendingNotices: [],
+    microWins: [],
   };
 }
 

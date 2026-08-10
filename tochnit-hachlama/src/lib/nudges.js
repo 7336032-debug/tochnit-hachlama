@@ -89,6 +89,10 @@ function genPattern(state, ctx) {
   return null;
 }
 
+function genReframePast() {
+  return 'ההרגלים הישנים לא נעלמים ביום אחד, וזה בסדר גמור - כל יום שאת מתעדת ועוקבת הוא כבר משהו אחר לגמרי ממה שהיה. העבר לא קובע את מה שקורה עכשיו.';
+}
+
 const GENERATORS = {
   if_then: genIfThen,
   loss_framing: genLossFraming,
@@ -97,6 +101,7 @@ const GENERATORS = {
   streak: genStreak,
   values: genValues,
   pattern: genPattern,
+  reframe_past: genReframePast,
 };
 
 export function buildCandidateNudges(state) {

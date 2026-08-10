@@ -44,6 +44,15 @@ export function expenseCountedAmount(e) {
   return e.isShared ? e.amount / 2 : e.amount;
 }
 
+export function expenseCategoryLabel(state, expense) {
+  const list = expense.categoryType === 'fixed' ? state.fixedCosts : state.envelopes;
+  return list.find((c) => c.id === expense.categoryId) || { emoji: '❔', name: 'לא ידוע' };
+}
+
+export function expensesForDate(state, dateISO) {
+  return state.expenses.filter((e) => e.date === dateISO);
+}
+
 export function monthExpensesByEnvelope(state, mKey) {
   const map = {};
   for (const e of state.expenses) {
